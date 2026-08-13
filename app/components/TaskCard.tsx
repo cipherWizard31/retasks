@@ -21,7 +21,7 @@ export default function TaskCard({ task, onComplete, onEdit, onDelete, onDuplica
     completed: '#10b981',
     due: '#f59e0b',
     overdue: '#ef4444',
-    upcoming: '#9ca3af',
+    upcoming: 'var(--muted)',
   }[task.status];
 
   const statusLabel = {
@@ -78,14 +78,14 @@ export default function TaskCard({ task, onComplete, onEdit, onDelete, onDuplica
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize: 14, fontWeight: 600, color: '#111827',
+              fontSize: 14, fontWeight: 600, color: 'var(--foreground)',
               textDecoration: checked ? 'line-through' : 'none',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
               {task.title}
             </div>
             {!compact && task.description && (
-              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {task.description}
               </div>
             )}
@@ -115,11 +115,11 @@ export default function TaskCard({ task, onComplete, onEdit, onDelete, onDuplica
             ● {statusLabel}
           </span>
           {task.reminderTime && (
-            <span className="badge" style={{ background: '#f0f9ff', color: '#0284c7' }}>
+            <span className="badge badge-time">
               🕐 {task.reminderTime}
             </span>
           )}
-          <span className="badge" style={{ background: '#f9fafb', color: '#6b7280' }}>
+          <span className="badge badge-repeat">
             🔁 {repeatLabel()}
           </span>
         </div>
@@ -128,7 +128,7 @@ export default function TaskCard({ task, onComplete, onEdit, onDelete, onDuplica
         {!compact && (
           <div style={{ marginTop: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: '#9ca3af' }}>Completion Rate</span>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>Completion Rate</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>{task.completionRate}%</span>
             </div>
             <div className="progress-bar">

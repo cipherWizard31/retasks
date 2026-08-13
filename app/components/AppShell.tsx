@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { logout } from '@/app/actions/auth';
+import { useAuth } from './auth-provider';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: '⊞' },
@@ -30,23 +32,26 @@ interface AppShellProps {
 
 export default function AppShell({ children, onAddTask }: AppShellProps) {
   const pathname = usePathname();
+  const user = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const sidebarWidth = collapsed ? '64px' : '240px';
+  const displayName = user?.name || 'User';
+  const initials = displayName.trim().charAt(0).toUpperCase() || 'U';
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--background)' }}>
       {/* Sidebar */}
       <aside
         className="desktop-sidebar"
         style={{
           width: sidebarWidth,
           minHeight: '100vh',
-          background: 'white',
-          borderRight: '1px solid #f1f5f9',
+          background: 'var(--surface)',
+          borderRight: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           position: 'fixed',
@@ -60,7 +65,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
         }}
       >
         {/* Logo */}
-        <div style={{ padding: collapsed ? '20px 0' : '20px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ padding: collapsed ? '20px 0' : '20px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: 36, height: 36, borderRadius: '10px', flexShrink: 0,
             background: 'linear-gradient(135deg, #10b981, #059669)',
@@ -72,7 +77,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
           </div>
           {!collapsed && (
             <div>
-              <div style={{ fontWeight: 800, fontSize: 16, color: '#111827', letterSpacing: '-0.01em' }}>ReTasks</div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--foreground)', letterSpacing: '-0.01em' }}>ReTasks</div>
               <div style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>Recurring Tasks</div>
             </div>
           )}
@@ -80,7 +85,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {!collapsed && <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 8px 4px' }} className="sidebar-section-label">Menu</div>}
+          {!collapsed && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 8px 4px' }} className="sidebar-section-label">Menu</div>}
           {NAV_ITEMS.slice(0, 5).map((item) => (
             <Link
               key={item.href}
@@ -94,7 +99,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
             </Link>
           ))}
 
-          {!collapsed && <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '12px 8px 4px' }} className="sidebar-section-label">Manage</div>}
+          {!collapsed && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '12px 8px 4px' }} className="sidebar-section-label">Manage</div>}
           {NAV_ITEMS.slice(5).map((item) => (
             <Link
               key={item.href}
@@ -110,14 +115,17 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
         </nav>
 
         {/* User Profile */}
-        <div style={{ borderTop: '1px solid #f1f5f9', padding: collapsed ? '12px 0' : '12px 8px' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '10px',
-            padding: '8px', borderRadius: '12px', cursor: 'pointer',
-            transition: 'background 0.15s',
-            justifyContent: collapsed ? 'center' : undefined,
-          }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+        <div style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '12px 0' : '12px 8px' }}>
+          <Link
+            href="/settings"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '8px', borderRadius: '12px', cursor: 'pointer',
+              transition: 'background 0.15s',
+              justifyContent: collapsed ? 'center' : undefined,
+              textDecoration: 'none',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-muted)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             <div style={{
@@ -125,14 +133,33 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
               background: 'linear-gradient(135deg, #10b981, #0ea5e9)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'white', fontWeight: 700, fontSize: 14,
-            }}>N</div>
+            }}>{initials}</div>
             {!collapsed && (
               <div className="user-info" style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Nate</div>
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>Free Plan</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--foreground)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{user?.email || 'Free Plan'}</div>
               </div>
             )}
-          </div>
+          </Link>
+
+          {!collapsed && (
+            <form action={logout}>
+              <button
+                type="submit"
+                id="logout-btn"
+                style={{
+                  width: '100%', padding: '8px', marginTop: 4,
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  borderRadius: '8px', color: 'var(--muted)', fontSize: 13,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-muted)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                Log out
+              </button>
+            </form>
+          )}
 
           {/* Collapse button */}
           <button
@@ -140,10 +167,10 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
             style={{
               width: '100%', padding: '8px', marginTop: 4,
               border: 'none', background: 'transparent', cursor: 'pointer',
-              borderRadius: '8px', color: '#9ca3af', fontSize: 13,
+              borderRadius: '8px', color: 'var(--muted)', fontSize: 13,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-muted)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             {collapsed ? '→' : '← Collapse'}
@@ -165,9 +192,9 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
           className="top-navbar"
           style={{
             position: 'sticky', top: 0, zIndex: 10,
-            background: 'rgba(248,250,252,0.95)',
+            background: 'color-mix(in srgb, var(--background) 95%, transparent)',
             backdropFilter: 'blur(12px)',
-            borderBottom: '1px solid #f1f5f9',
+            borderBottom: '1px solid var(--border)',
             padding: '0 24px',
             height: 64,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -176,7 +203,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
         >
           {/* Search */}
           <div style={{ flex: 1, maxWidth: 400, position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 16 }}>🔍</span>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: 16 }}>🔍</span>
             <input
               id="global-search"
               type="text"
@@ -184,7 +211,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
               placeholder="Search tasks…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{ paddingLeft: 38, background: 'white', borderColor: '#e5e7eb' }}
+              style={{ paddingLeft: 38 }}
             />
           </div>
 
@@ -206,7 +233,8 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
                 onClick={() => setNotifOpen(!notifOpen)}
                 style={{
                   position: 'relative', width: 40, height: 40,
-                  border: 'none', background: notifOpen ? '#f0fdf4' : 'white',
+                  border: 'none',
+                  background: notifOpen ? 'var(--accent-color-light)' : 'var(--surface)',
                   borderRadius: '10px', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 18, transition: 'all 0.15s',
@@ -217,7 +245,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
                 <span style={{
                   position: 'absolute', top: 8, right: 8,
                   width: 8, height: 8, borderRadius: '50%',
-                  background: '#10b981', border: '2px solid white',
+                  background: '#10b981', border: '2px solid var(--surface)',
                 }} />
               </button>
               <span className="tooltip">Notifications</span>
@@ -231,7 +259,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'white', fontWeight: 700, fontSize: 14,
                 boxShadow: '0 2px 8px rgba(16,185,129,0.25)',
-              }}>N</div>
+              }}>{initials}</div>
             </Link>
           </div>
         </header>
@@ -251,7 +279,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
             style={{
               flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: 3, padding: '8px 0', textDecoration: 'none',
-              color: pathname === item.href ? '#10b981' : '#9ca3af',
+              color: pathname === item.href ? 'var(--accent-color)' : 'var(--muted)',
               fontSize: 11, fontWeight: 600,
               transition: 'color 0.15s',
             }}

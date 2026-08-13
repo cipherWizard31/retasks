@@ -50,7 +50,7 @@ export const TASKS: Task[] = [
     description: "Daily scripture reading and devotional time",
     category: "spiritual",
     priority: "high",
-    status: "due",
+    status: "completed",
     repeatType: "daily",
     reminderTime: "8:00 AM",
     startDate: "2025-01-01",

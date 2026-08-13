@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Category, Priority, RepeatType, CompletionLogic, CATEGORY_META } from '../../lib/data';
 
 interface CreateTaskModalProps {
@@ -25,7 +25,9 @@ export default function CreateTaskModal({ onClose, onSave }: CreateTaskModalProp
 
   const handleSave = () => {
     if (!title.trim()) return;
-    const task = { id: Date.now().toString(), title, description, category, priority, repeatType, repeatInterval: showIntervalInput ? repeatInterval : undefined, startDate, reminderTime, completionLogic, status: 'upcoming', completionRate: 0, streak: 0, totalCompleted: 0, totalMissed: 0 };
+    const isToday = startDate === new Date().toISOString().split('T')[0];
+    const status = isToday ? 'due' : 'upcoming';
+    const task = { id: Date.now().toString(), title, description, category, priority, repeatType, repeatInterval: showIntervalInput ? repeatInterval : undefined, startDate, reminderTime, completionLogic, status, completionRate: 0, streak: 0, totalCompleted: 0, totalMissed: 0 };
     onSave?.(task);
     onClose();
   };
