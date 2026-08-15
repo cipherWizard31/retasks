@@ -9,7 +9,7 @@ import { completeTaskAction, deleteTaskAction, createTaskAction, uncheckTaskActi
 import { syncAndGetStreak } from './actions/streak';
 
 const SUMMARY_CARDS = [
-  { label: 'Due Today',icon: '📅', color: '#f59e0b' },
+  { label: 'Due Today', icon: '📅', color: '#f59e0b' },
   { label: 'Completed', icon: '✅', color: '#10b981' },
   { label: 'Remaining', icon: '⏳', color: '#94a3b8' },
   { label: 'Completion Rate', icon: '📈', color: '#0ea5e9' },
@@ -95,7 +95,7 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
                 Good {getHour()}, Nate 👋
               </h1>
               <p style={{ margin: '8px 0 0', fontSize: 14, color: '#a7f3d0' }}>
-                You have <strong style={{ color: 'white' }}>{todayTasks.filter(t => t.status !== 'completed').length} tasks</strong> due today. {todayTasks.filter(t => t.status === 'due' || t.status === 'overdue').length  === 0 ? "Enjoy your day!" : "Let\'s get them done!" }
+                You have <strong style={{ color: 'white' }}>{todayTasks.filter(t => t.status !== 'completed').length} tasks</strong> due today. {todayTasks.filter(t => t.status === 'due' || t.status === 'overdue').length === 0 ? "Enjoy your day!" : "Let\'s get them done!"}
               </p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
@@ -123,9 +123,9 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
                     <div style={{ fontSize: 28, fontWeight: 800, color: card.color }}>
                       {card.label === 'Due Today' ? todayTasks.filter(t => t.status !== 'completed').length :
                         card.label === 'Completed' ? todayTasks.filter(t => t.status === 'completed').length :
-                        card.label === 'Remaining' ? todayTasks.filter(t => t.status === 'due' || t.status === 'overdue').length :
-                        card.label === 'Completion Rate' ? `${todayTasks.length > 0 ? Math.round((todayTasks.filter(t => t.status === 'completed').length / todayTasks.length) * 100) : 0}%`
-                      : ''}
+                          card.label === 'Remaining' ? todayTasks.filter(t => t.status === 'due' || t.status === 'overdue').length :
+                            card.label === 'Completion Rate' ? `${todayTasks.length > 0 ? Math.round((todayTasks.filter(t => t.status === 'completed').length / todayTasks.length) * 100) : 0}%`
+                              : ''}
                     </div>
                   </div>
                   <div style={{ fontSize: 24 }}>{card.icon}</div>
@@ -184,22 +184,22 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
               {(Object.entries(CATEGORY_META) as [string, typeof CATEGORY_META[keyof typeof CATEGORY_META]][])
                 .filter(([key]) => tasks.some(t => t.category === key))
                 .map(([key, meta]) => {
-                const categoryTasks = tasks.filter(t => t.category === key);
-                const count = categoryTasks.length;
-                const completedCount = categoryTasks.filter(t => t.status === 'completed').length;
-                const rate = count > 0 ? Math.round((completedCount / count) * 100) : 0;
-                return (
-                  <div key={key} className="card" style={{ padding: '14px 16px', cursor: 'pointer' }}>
-                    <div style={{ fontSize: 24, marginBottom: 8 }}>{meta.icon}</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>{meta.label}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>{count} tasks</div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${rate}%`, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
+                  const categoryTasks = tasks.filter(t => t.category === key);
+                  const count = categoryTasks.length;
+                  const completedCount = categoryTasks.filter(t => t.status === 'completed').length;
+                  const rate = count > 0 ? Math.round((completedCount / count) * 100) : 0;
+                  return (
+                    <div key={key} className="card" style={{ padding: '14px 16px', cursor: 'pointer' }}>
+                      <div style={{ fontSize: 24, marginBottom: 8 }}>{meta.icon}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>{meta.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>{count} tasks</div>
+                      <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${rate}%`, background: `linear-gradient(90deg, ${meta.color}99, ${meta.color})` }} />
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: meta.color, marginTop: 4 }}>{rate}%</div>
                     </div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: meta.color, marginTop: 4 }}>{rate}%</div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </section>
         </div>
