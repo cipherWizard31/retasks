@@ -55,6 +55,12 @@ function createDatabase() {
       totalCompleted INTEGER NOT NULL DEFAULT 0,
       totalMissed INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS daily_logs (
+      date TEXT PRIMARY KEY NOT NULL,
+      tasks_completed INTEGER NOT NULL DEFAULT 0,
+      tasks_due INTEGER NOT NULL DEFAULT 0,
+      met_goal INTEGER NOT NULL DEFAULT 0
+    );
   `)
 
   return database
@@ -79,6 +85,13 @@ db.exec(`
     streak INTEGER NOT NULL DEFAULT 0,
     totalCompleted INTEGER NOT NULL DEFAULT 0,
     totalMissed INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS daily_logs (
+    date TEXT PRIMARY KEY NOT NULL,
+    tasks_completed INTEGER NOT NULL DEFAULT 0,
+    tasks_due INTEGER NOT NULL DEFAULT 0,
+    met_goal INTEGER NOT NULL DEFAULT 0
   );
 `)
 
@@ -155,25 +168,12 @@ export function getTasks(): Task[] {
   return rows.map(row => ({ ...row }))
 }
 
-export function seedTasks(tasks: Task[]) {
-  const insert = db.prepare(`
-    INSERT INTO tasks (
-      id, title, description, category, priority, status, repeatType, 
-      repeatInterval, reminderTime, startDate, completionLogic, 
-      completionRate, streak, totalCompleted, totalMissed
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-  for (const t of tasks) {
-    insert.run(
-      t.id, t.title, t.description || null, t.category, t.priority, t.status, t.repeatType,
-      t.repeatInterval || null, t.reminderTime || null, t.startDate, t.completionLogic,
-      t.completionRate, t.streak, t.totalCompleted, t.totalMissed
-    )
-  }
-}
-
 export function completeTaskDb(id: string) {
   db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run('completed', id)
+}
+
+export function uncheckTaskDb(id: string) {
+  db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run('due', id)
 }
 
 export function deleteTaskDb(id: string) {
@@ -192,4 +192,41 @@ export function createTaskDb(input: Task) {
     input.repeatInterval || null, input.reminderTime || null, input.startDate, input.completionLogic,
     input.completionRate || 0, input.streak || 0, input.totalCompleted || 0, input.totalMissed || 0
   )
+}
+
+export function editTaskDb(input: Task) {
+  db.prepare(`
+    UPDATE tasks SET
+      title = ?, description = ?, category = ?, priority = ?,
+      repeatType = ?, repeatInterval = ?, reminderTime = ?,
+      startDate = ?, completionLogic = ?, status = ?
+    WHERE id = ?
+  `).run(
+    input.title, input.description || null, input.category, input.priority,
+    input.repeatType, input.repeatInterval || null, input.reminderTime || null,
+    input.startDate, input.completionLogic, input.status,
+    input.id
+  )
+}
+
+export type DailyLog = {
+  date: string
+  tasks_completed: number
+  tasks_due: number
+  met_goal: number
+}
+
+export function getDailyLogs(): DailyLog[] {
+  return db.prepare('SELECT * FROM daily_logs ORDER BY date DESC').all() as DailyLog[]
+}
+
+export function upsertDailyLog(date: string, tasksCompleted: number, tasksDue: number, metGoal: boolean) {
+  db.prepare(`
+    INSERT INTO daily_logs (date, tasks_completed, tasks_due, met_goal)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(date) DO UPDATE SET
+      tasks_completed = excluded.tasks_completed,
+      tasks_due = excluded.tasks_due,
+      met_goal = excluded.met_goal
+  `).run(date, tasksCompleted, tasksDue, metGoal ? 1 : 0)
 }

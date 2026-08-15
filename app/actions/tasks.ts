@@ -1,6 +1,6 @@
 'use server'
 
-import { completeTaskDb, deleteTaskDb, createTaskDb } from '@/lib/db'
+import { completeTaskDb, deleteTaskDb, createTaskDb, uncheckTaskDb, editTaskDb } from '@/lib/db'
 import type { Task } from '@/lib/data'
 import { revalidatePath } from 'next/cache'
 
@@ -16,5 +16,15 @@ export async function deleteTaskAction(id: string) {
 
 export async function createTaskAction(task: Task) {
   createTaskDb(task)
+  revalidatePath('/')
+}
+
+export async function uncheckTaskAction(id: string) {
+  uncheckTaskDb(id)
+  revalidatePath('/')
+}
+
+export async function editTaskAction(task: Task) {
+  editTaskDb(task)
   revalidatePath('/')
 }

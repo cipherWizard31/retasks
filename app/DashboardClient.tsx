@@ -1,32 +1,49 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import AppShell from './components/AppShell';
 import CreateTaskModal from './components/CreateTaskModal';
 import TaskCard from './components/TaskCard';
 import { Task, CATEGORY_META } from '../lib/data';
-import { completeTaskAction, deleteTaskAction, createTaskAction } from './actions/tasks';
+import { completeTaskAction, deleteTaskAction, createTaskAction, uncheckTaskAction, editTaskAction } from './actions/tasks';
+import { syncAndGetStreak } from './actions/streak';
 
 const SUMMARY_CARDS = [
-  { label: 'Due Today', value: 4, icon: '📅', color: '#f59e0b' },
-  { label: 'Completed', value: 6, icon: '✅', color: '#10b981' },
-  { label: 'Remaining', value: 4, icon: '⏳', color: '#94a3b8' },
-  { label: 'Completion Rate', value: '60%', icon: '📈', color: '#0ea5e9' },
+  { label: 'Due Today',icon: '📅', color: '#f59e0b' },
+  { label: 'Completed', icon: '✅', color: '#10b981' },
+  { label: 'Remaining', icon: '⏳', color: '#94a3b8' },
+  { label: 'Completion Rate', icon: '📈', color: '#0ea5e9' },
 ];
 
 export default function DashboardClient({ tasks }: { tasks: Task[] }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const todayTasks = tasks.filter(t => t.status === 'due' || t.status === 'overdue' || t.status === 'completed');
 
-  const UPCOMING_GROUPS = [
-    { label: 'Tomorrow', tasks: tasks.filter(t => t.status === 'upcoming') }
-  ];
+
+  const [streak, setStreak] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchStreak = async () => {
+      const dateStr = new Date().toLocaleDateString('en-CA');
+      const completed = todayTasks.filter(t => t.status === 'completed').length;
+      const due = todayTasks.length;
+      const currentStreak = await syncAndGetStreak(dateStr, completed, due);
+      setStreak(currentStreak);
+    };
+    fetchStreak();
+  }, [todayTasks.length, todayTasks.filter(t => t.status === 'completed').length]);
 
   const handleComplete = (id: string) => {
     startTransition(() => {
       completeTaskAction(id);
+    });
+  };
+  const handleUncheck = (id: string) => {
+    startTransition(() => {
+      uncheckTaskAction(id);
     });
   };
 
@@ -39,6 +56,12 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
   const handleCreate = (task: Record<string, unknown>) => {
     startTransition(() => {
       createTaskAction(task as unknown as Task);
+    });
+  };
+
+  const handleSaveEdit = (task: Record<string, unknown>) => {
+    startTransition(() => {
+      editTaskAction(task as unknown as Task);
     });
   };
 
@@ -72,13 +95,13 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
                 Good {getHour()}, Nate 👋
               </h1>
               <p style={{ margin: '8px 0 0', fontSize: 14, color: '#a7f3d0' }}>
-                You have <strong style={{ color: 'white' }}>{todayTasks.filter(t => t.status !== 'completed').length} tasks</strong> due today. Let's get them done!
+                You have <strong style={{ color: 'white' }}>{todayTasks.filter(t => t.status !== 'completed').length} tasks</strong> due today. {todayTasks.filter(t => t.status === 'due' || t.status === 'overdue').length  === 0 ? "Enjoy your day!" : "Let\'s get them done!" }
               </p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
               <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 16px', backdropFilter: 'blur(8px)' }}>
                 <div style={{ fontSize: 11, color: '#6ee7b7', fontWeight: 600, marginBottom: 2 }}>TODAY'S STREAK</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: 'white' }}>🔥 14 days</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: 'white' }}>🔥 {streak !== null ? streak : '--'} {streak === 1 ? "day" : "days"}</div>
               </div>
             </div>
           </div>
@@ -98,9 +121,11 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{card.label}</div>
                     <div style={{ fontSize: 28, fontWeight: 800, color: card.color }}>
-                      {card.label === 'Due Today' ? todayTasks.filter(t => t.status !== 'completed').length : 
-                       card.label === 'Completed' ? todayTasks.filter(t => t.status === 'completed').length : 
-                       card.value}
+                      {card.label === 'Due Today' ? todayTasks.filter(t => t.status !== 'completed').length :
+                        card.label === 'Completed' ? todayTasks.filter(t => t.status === 'completed').length :
+                        card.label === 'Remaining' ? todayTasks.filter(t => t.status === 'due' || t.status === 'overdue').length :
+                        card.label === 'Completion Rate' ? `${todayTasks.length > 0 ? Math.round((todayTasks.filter(t => t.status === 'completed').length / todayTasks.length) * 100) : 0}%`
+                      : ''}
                     </div>
                   </div>
                   <div style={{ fontSize: 24 }}>{card.icon}</div>
@@ -108,7 +133,7 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
                 {i === 3 && (
                   <div style={{ marginTop: 10 }}>
                     <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: '60%', background: `linear-gradient(90deg, ${card.color}, ${card.color}cc)` }} />
+                      <div className="progress-fill" style={{ width: `${todayTasks.length > 0 ? Math.round((todayTasks.filter(t => t.status === 'completed').length / todayTasks.length) * 100) : 0}%`, background: `linear-gradient(90deg, ${card.color}, ${card.color}cc)` }} />
                     </div>
                   </div>
                 )}
@@ -142,9 +167,9 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
                     <TaskCard
                       task={task}
                       onComplete={handleComplete}
-                      onEdit={() => {}}
+                      onUncheck={handleUncheck}
+                      onEdit={() => setEditingTask(task)}
                       onDelete={handleDelete}
-                      onDuplicate={() => {}}
                     />
                   </div>
                 ))}
@@ -152,44 +177,17 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
             )}
           </section>
 
-          {/* Upcoming Section */}
-          <section className="animate-fade-in delay-300">
-            <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Upcoming</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {UPCOMING_GROUPS.map((group) => (
-                <div key={group.label}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                    <div style={{ height: 1, flex: 0, width: 20, background: 'var(--border-strong)' }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
-                      {group.label}
-                    </span>
-                    <div style={{ height: 1, flex: 1, background: 'var(--border-strong)' }} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {group.tasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={{ ...task, status: 'upcoming' }}
-                        onComplete={handleComplete}
-                        onEdit={() => {}}
-                        onDelete={handleDelete}
-                        onDuplicate={() => {}}
-                        compact
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
           {/* Category Overview */}
           <section className="animate-fade-in delay-400">
             <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Category Overview</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-              {(Object.entries(CATEGORY_META) as [string, typeof CATEGORY_META[keyof typeof CATEGORY_META]][]).map(([key, meta]) => {
-                const count = tasks.filter(t => t.category === key).length;
-                const rate = count > 0 ? Math.round(tasks.filter(t => t.category === key).reduce((a, t) => a + t.completionRate, 0) / count) : 0;
+              {(Object.entries(CATEGORY_META) as [string, typeof CATEGORY_META[keyof typeof CATEGORY_META]][])
+                .filter(([key]) => tasks.some(t => t.category === key))
+                .map(([key, meta]) => {
+                const categoryTasks = tasks.filter(t => t.category === key);
+                const count = categoryTasks.length;
+                const completedCount = categoryTasks.filter(t => t.status === 'completed').length;
+                const rate = count > 0 ? Math.round((completedCount / count) * 100) : 0;
                 return (
                   <div key={key} className="card" style={{ padding: '14px 16px', cursor: 'pointer' }}>
                     <div style={{ fontSize: 24, marginBottom: 8 }}>{meta.icon}</div>
@@ -207,8 +205,12 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
         </div>
       </AppShell>
 
-      {modalOpen && (
-        <CreateTaskModal onClose={() => setModalOpen(false)} onSave={handleCreate} />
+      {(modalOpen || editingTask) && (
+        <CreateTaskModal
+          initialTask={editingTask}
+          onClose={() => { setModalOpen(false); setEditingTask(null); }}
+          onSave={editingTask ? handleSaveEdit : handleCreate}
+        />
       )}
     </>
   );

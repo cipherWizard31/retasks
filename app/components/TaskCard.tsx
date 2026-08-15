@@ -2,17 +2,19 @@
 
 import React, { useState } from 'react';
 import { Task, CATEGORY_META } from '../../lib/data';
+import { BiRepeat, BiTime } from 'react-icons/bi';
+import { FaDeleteLeft, FaPencil, FaTrash } from 'react-icons/fa6';
 
 interface TaskCardProps {
   task: Task;
   onComplete?: (id: string) => void;
+  onUncheck?: (id: string) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (id: string) => void;
-  onDuplicate?: (task: Task) => void;
   compact?: boolean;
 }
 
-export default function TaskCard({ task, onComplete, onEdit, onDelete, onDuplicate, compact }: TaskCardProps) {
+export default function TaskCard({ task, onUncheck, onComplete, onEdit, onDelete, compact }: TaskCardProps) {
   const [checked, setChecked] = useState(task.status === 'completed');
   const [hovered, setHovered] = useState(false);
   const meta = CATEGORY_META[task.category];
@@ -42,8 +44,10 @@ export default function TaskCard({ task, onComplete, onEdit, onDelete, onDuplica
   };
 
   const handleCheck = () => {
-    setChecked(!checked);
-    if (!checked && onComplete) onComplete(task.id);
+    const newChecked = !checked;
+    setChecked(newChecked);
+    if (newChecked && onComplete) onComplete(task.id);
+    if (!newChecked && onUncheck) onUncheck(task.id);
   };
 
   return (
@@ -94,13 +98,10 @@ export default function TaskCard({ task, onComplete, onEdit, onDelete, onDuplica
           {/* Quick actions */}
           <div className="task-quick-actions" style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
             {onEdit && (
-              <button className="btn btn-ghost btn-xs" onClick={() => onEdit(task)} title="Edit" style={{ padding: '4px 6px' }}>✏️</button>
-            )}
-            {onDuplicate && (
-              <button className="btn btn-ghost btn-xs" onClick={() => onDuplicate(task)} title="Duplicate" style={{ padding: '4px 6px' }}>📋</button>
+              <button className="btn btn-ghost btn-xs" onClick={() => onEdit(task)} title="Edit" style={{ padding: '4px 6px' }}><FaPencil /></button>
             )}
             {onDelete && (
-              <button className="btn btn-ghost btn-xs" onClick={() => onDelete(task.id)} title="Delete" style={{ padding: '4px 6px', color: '#ef4444' }}>🗑️</button>
+              <button className="btn btn-ghost btn-xs" onClick={() => onDelete(task.id)} title="Delete" style={{ padding: '4px 6px', color: '#ef4444' }}><FaTrash /></button>
             )}
           </div>
         </div>
@@ -116,11 +117,11 @@ export default function TaskCard({ task, onComplete, onEdit, onDelete, onDuplica
           </span>
           {task.reminderTime && (
             <span className="badge badge-time">
-              🕐 {task.reminderTime}
+              <BiTime /> {task.reminderTime}
             </span>
           )}
           <span className="badge badge-repeat">
-            🔁 {repeatLabel()}
+            <BiRepeat /> {repeatLabel()}
           </span>
         </div>
 

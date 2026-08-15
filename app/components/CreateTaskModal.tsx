@@ -1,23 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { Category, Priority, RepeatType, CompletionLogic, CATEGORY_META } from '../../lib/data';
+import { Task, Category, Priority, RepeatType, CompletionLogic, CATEGORY_META } from '../../lib/data';
 
 interface CreateTaskModalProps {
+  initialTask?: Task | null;
   onClose: () => void;
   onSave?: (task: Record<string, unknown>) => void;
 }
 
-export default function CreateTaskModal({ onClose, onSave }: CreateTaskModalProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState<Category>('personal');
-  const [priority, setPriority] = useState<Priority>('medium');
-  const [repeatType, setRepeatType] = useState<RepeatType>('daily');
-  const [repeatInterval, setRepeatInterval] = useState(3);
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [reminderTime, setReminderTime] = useState('08:00');
-  const [completionLogic, setCompletionLogic] = useState<CompletionLogic>('fixed');
+export default function CreateTaskModal({ initialTask, onClose, onSave }: CreateTaskModalProps) {
+  const [title, setTitle] = useState(initialTask?.title || '');
+  const [description, setDescription] = useState(initialTask?.description || '');
+  const [category, setCategory] = useState<Category>(initialTask?.category || 'personal');
+  const [priority, setPriority] = useState<Priority>(initialTask?.priority || 'medium');
+  const [repeatType, setRepeatType] = useState<RepeatType>(initialTask?.repeatType || 'daily');
+  const [repeatInterval, setRepeatInterval] = useState(initialTask?.repeatInterval || 3);
+  const [startDate, setStartDate] = useState(initialTask?.startDate || new Date().toISOString().split('T')[0]);
+  const [reminderTime, setReminderTime] = useState(initialTask?.reminderTime || '08:00');
+  const [completionLogic, setCompletionLogic] = useState<CompletionLogic>(initialTask?.completionLogic || 'fixed');
   const [step, setStep] = useState(1);
 
   const showIntervalInput = ['every_x_days', 'every_x_weeks', 'every_x_months'].includes(repeatType);
@@ -27,7 +28,11 @@ export default function CreateTaskModal({ onClose, onSave }: CreateTaskModalProp
     if (!title.trim()) return;
     const isToday = startDate === new Date().toISOString().split('T')[0];
     const status = isToday ? 'due' : 'upcoming';
-    const task = { id: Date.now().toString(), title, description, category, priority, repeatType, repeatInterval: showIntervalInput ? repeatInterval : undefined, startDate, reminderTime, completionLogic, status, completionRate: 0, streak: 0, totalCompleted: 0, totalMissed: 0 };
+    const task = { 
+      id: initialTask?.id || Date.now().toString(), 
+      title, description, category, priority, repeatType, repeatInterval: showIntervalInput ? repeatInterval : undefined, startDate, reminderTime, completionLogic, status, 
+      completionRate: initialTask?.completionRate || 0, streak: initialTask?.streak || 0, totalCompleted: initialTask?.totalCompleted || 0, totalMissed: initialTask?.totalMissed || 0 
+    };
     onSave?.(task);
     onClose();
   };
@@ -39,8 +44,8 @@ export default function CreateTaskModal({ onClose, onSave }: CreateTaskModalProp
         <div style={{ padding: '24px 28px 0', borderBottom: '1px solid #f1f5f9', paddingBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#111827' }}>Create Task</h2>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#9ca3af' }}>Add a new recurring task to your schedule</p>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#111827' }}>{initialTask ? 'Edit Task' : 'Create Task'}</h2>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#9ca3af' }}>{initialTask ? 'Update your recurring task' : 'Add a new recurring task to your schedule'}</p>
             </div>
             <button
               id="close-modal-btn"
@@ -275,7 +280,7 @@ export default function CreateTaskModal({ onClose, onSave }: CreateTaskModalProp
               </button>
             ) : (
               <button id="modal-create-btn" className="btn btn-primary" onClick={handleSave} disabled={!title.trim()}>
-                ✓ Create Task
+                ✓ {initialTask ? 'Save Changes' : 'Create Task'}
               </button>
             )}
           </div>
