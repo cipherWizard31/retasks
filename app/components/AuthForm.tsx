@@ -61,12 +61,22 @@ export default function AuthForm({ mode }: AuthFormProps) {
       </div>
 
       <div>
-        <label
-          htmlFor="password"
-          style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}
-        >
-          Password
-        </label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <label
+            htmlFor="password"
+            style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)' }}
+          >
+            Password
+          </label>
+          {mode === 'login' && (
+            <Link
+              href="/forgot-password"
+              style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-color)', textDecoration: 'none' }}
+            >
+              Forgot password?
+            </Link>
+          )}
+        </div>
         <input
           id="password"
           name="password"

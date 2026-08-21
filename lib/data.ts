@@ -28,6 +28,7 @@ export interface Task {
   status: Status;
   repeatType: RepeatType;
   repeatInterval?: number;
+  repeatUnit?: "days" | "weeks" | "months" | "years" | "hours" | string;
   reminderTime?: string;
   startDate: string;
   completionLogic: CompletionLogic;
@@ -35,6 +36,9 @@ export interface Task {
   streak: number;
   totalCompleted: number;
   totalMissed: number;
+  isArchived?: boolean | number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface HistoryEntry {

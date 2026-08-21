@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: '/history', label: 'History', icon: '📋' },
   { href: '/categories', label: 'Categories', icon: '🏷️' },
   { href: '/statistics', label: 'Statistics', icon: '📊' },
+  { href: '/profile', label: 'Profile', icon: '👤' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
@@ -115,7 +116,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
         {/* User Profile */}
         <div style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '12px 0' : '12px 8px' }}>
           <Link
-            href="/settings"
+            href="/profile"
             style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '8px', borderRadius: '12px', cursor: 'pointer',

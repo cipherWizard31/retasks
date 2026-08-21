@@ -119,7 +119,12 @@ export default function SettingsPage() {
 
             {activeSection === 'profile' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Profile</h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Profile Settings</h2>
+                  <a href="/profile" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
+                    Open Full Profile Page 👤
+                  </a>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{
                     width: 72, height: 72, borderRadius: '50%',

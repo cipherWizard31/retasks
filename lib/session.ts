@@ -124,5 +124,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     id: user.id,
     name: user.name,
     email: user.email,
+    bio: user.bio,
+    timezone: user.timezone,
+    created_at: user.created_at,
   }
 }

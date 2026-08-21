@@ -28,10 +28,27 @@ export default function CreateTaskModal({ initialTask, onClose, onSave }: Create
     if (!title.trim()) return;
     const isToday = startDate === new Date().toISOString().split('T')[0];
     const status = isToday ? 'due' : 'upcoming';
+    const now = new Date().toISOString();
     const task = { 
       id: initialTask?.id || Date.now().toString(), 
-      title, description, category, priority, repeatType, repeatInterval: showIntervalInput ? repeatInterval : undefined, startDate, reminderTime, completionLogic, status, 
-      completionRate: initialTask?.completionRate || 0, streak: initialTask?.streak || 0, totalCompleted: initialTask?.totalCompleted || 0, totalMissed: initialTask?.totalMissed || 0 
+      title,
+      description,
+      category,
+      priority,
+      repeatType,
+      repeatInterval: showIntervalInput ? repeatInterval : undefined,
+      repeatUnit: showIntervalInput ? intervalUnit.toLowerCase() : repeatType === 'daily' ? 'days' : repeatType === 'weekly' ? 'weeks' : repeatType === 'monthly' ? 'months' : 'days',
+      startDate,
+      reminderTime,
+      completionLogic,
+      status, 
+      completionRate: initialTask?.completionRate || 0,
+      streak: initialTask?.streak || 0,
+      totalCompleted: initialTask?.totalCompleted || 0,
+      totalMissed: initialTask?.totalMissed || 0,
+      isArchived: initialTask?.isArchived || false,
+      createdAt: initialTask?.createdAt || now,
+      updatedAt: now,
     };
     onSave?.(task);
     onClose();

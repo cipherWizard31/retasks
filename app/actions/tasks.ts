@@ -1,6 +1,15 @@
 'use server'
 
-import { completeTaskDb, deleteTaskDb, createTaskDb, uncheckTaskDb, editTaskDb } from '@/lib/db'
+import {
+  completeTaskDb,
+  deleteTaskDb,
+  createTaskDb,
+  uncheckTaskDb,
+  editTaskDb,
+  archiveTaskDb,
+  recordTaskCompletionDb,
+  createCustomCategoryDb,
+} from '@/lib/db'
 import type { Task } from '@/lib/data'
 import { revalidatePath } from 'next/cache'
 
@@ -27,4 +36,21 @@ export async function uncheckTaskAction(id: string) {
 export async function editTaskAction(task: Task) {
   editTaskDb(task)
   revalidatePath('/')
+}
+
+export async function archiveTaskAction(id: string, isArchived: boolean = true) {
+  archiveTaskDb(id, isArchived)
+  revalidatePath('/')
+}
+
+export async function recordTaskCompletionAction(input: { taskId: string; notes?: string; completionDate?: string }) {
+  recordTaskCompletionDb(input)
+  revalidatePath('/')
+  revalidatePath('/history')
+}
+
+export async function createCustomCategoryAction(input: { label: string; icon: string; color: string }) {
+  const result = createCustomCategoryDb(input)
+  revalidatePath('/categories')
+  return result
 }
