@@ -5,7 +5,7 @@ import AppShell from './components/AppShell';
 import CreateTaskModal from './components/CreateTaskModal';
 import TaskCard from './components/TaskCard';
 import { Task, CATEGORY_META } from '../lib/data';
-import { completeTaskAction, deleteTaskAction, createTaskAction, uncheckTaskAction, editTaskAction } from './actions/tasks';
+import { completeTaskAction, deleteTaskAction, createTaskAction, uncheckTaskAction, editTaskAction, skipTaskAction } from './actions/tasks';
 import { syncAndGetStreak } from './actions/streak';
 
 const SUMMARY_CARDS = [
@@ -44,6 +44,12 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
   const handleUncheck = (id: string) => {
     startTransition(() => {
       uncheckTaskAction(id);
+    });
+  };
+
+  const handleSkip = (id: string) => {
+    startTransition(() => {
+      skipTaskAction(id);
     });
   };
 
@@ -168,6 +174,7 @@ export default function DashboardClient({ tasks }: { tasks: Task[] }) {
                       task={task}
                       onComplete={handleComplete}
                       onUncheck={handleUncheck}
+                      onSkip={handleSkip}
                       onEdit={() => setEditingTask(task)}
                       onDelete={handleDelete}
                     />

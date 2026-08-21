@@ -63,7 +63,7 @@ Each task should store:
 - [x] Create task
 - [x] Validate inputs
 - [x] Save task
-- [ ] Calculate first due date
+- [x] Calculate first due date
 
 ---
 
@@ -72,15 +72,15 @@ Each task should store:
 - [x] Edit task
 - [x] Update recurrence
 - [x] Update reminders
-- [ ] Recalculate due date
+- [x] Recalculate due date
 
 ---
 
 ## Delete Task
 
-- [ ] Soft delete
+- [x] Soft delete
 - [x] Permanent delete
-- [ ] Restore deleted task
+- [x] Restore deleted task
 
 ---
 
@@ -125,7 +125,7 @@ Next due = Today + 3 days
 
 Automatically calculate:
 
-- [ ] Next due date
+- [x] Next due date
 - [x] Overdue status
 - [x] Upcoming tasks
 - [x] Today's tasks
@@ -138,21 +138,13 @@ Complete Task
 
 - [x] Mark complete
 - [x] Save completion
-- [ ] Calculate next occurrence
-- [ ] Update dashboard
+- [x] Calculate next occurrence
+- [x] Update dashboard
 
 Skip Task
 
-- [ ] Skip today
-- [ ] Calculate next occurrence
-
-Snooze
-
-- [ ] 30 minutes
-- [ ] 1 hour
-- [ ] Tonight
-- [ ] Tomorrow
-- [ ] Custom
+- [x] Skip today
+- [x] Calculate next occurrence
 
 Undo Completion
 
@@ -221,15 +213,10 @@ Local notifications
 
 - [ ] Browser notifications
 
-Email notifications
-
-- [ ] Daily summary
-- [ ] Due reminder
 
 Push notifications
 
 - [ ] Web Push
-- [ ] Mobile Push (future)
 
 Reminder scheduler
 
@@ -248,26 +235,7 @@ Reminder scheduler
 
 ---
 
-# Phase 10 — Templates
-
-Default templates
-
-- [ ] Morning Routine
-- [ ] Gym
-- [ ] Bible Reading
-- [ ] Student
-- [ ] Cleaning
-
-User templates
-
-- [ ] Save template
-- [ ] Edit template
-- [ ] Delete template
-- [ ] Apply template
-
----
-
-# Phase 11 — Search & Filters
+# Phase 10 — Search & Filters
 
 Search
 
@@ -291,7 +259,7 @@ Sorting
 
 ---
 
-# Phase 12 — Statistics
+# Phase 11 — Statistics
 
 Calculate
 
@@ -307,7 +275,7 @@ Calculate
 
 ---
 
-# Phase 13 — History
+# Phase 12 — History
 
 Store every completion.
 
@@ -324,7 +292,7 @@ Allow
 
 ---
 
-# Phase 14 — Settings
+# Phase 13 — Settings
 
 - [x] Theme
 - [ ] Timezone
@@ -335,7 +303,7 @@ Allow
 
 ---
 
-# Phase 15 — Data Management
+# Phase 14 — Data Management
 
 - [ ] Export JSON
 - [ ] Export CSV
@@ -345,7 +313,7 @@ Allow
 
 ---
 
-# Phase 16 — Performance
+# Phase 15 — Performance
 
 - [ ] Pagination
 - [ ] Lazy loading
@@ -355,7 +323,7 @@ Allow
 
 ---
 
-# Phase 17 — Security
+# Phase 16 — Security
 
 - [x] Authentication middleware
 - [x] Authorization
@@ -367,7 +335,7 @@ Allow
 
 ---
 
-# Phase 18 — Testing
+# Phase 17 — Testing
 
 - [ ] Unit tests
 - [ ] API tests
@@ -377,7 +345,7 @@ Allow
 
 ---
 
-# Phase 19 — Production
+# Phase 18 — Production
 
 - [ ] Error logging
 - [ ] Analytics

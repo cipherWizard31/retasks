@@ -9,15 +9,16 @@ interface TaskCardProps {
   task: Task;
   onComplete?: (id: string) => void;
   onUncheck?: (id: string) => void;
+  onSkip?: (id: string) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (id: string) => void;
   compact?: boolean;
 }
 
-export default function TaskCard({ task, onUncheck, onComplete, onEdit, onDelete, compact }: TaskCardProps) {
+export default function TaskCard({ task, onUncheck, onComplete, onSkip, onEdit, onDelete, compact }: TaskCardProps) {
   const [checked, setChecked] = useState(task.status === 'completed');
   const [hovered, setHovered] = useState(false);
-  const meta = CATEGORY_META[task.category];
+  const meta = CATEGORY_META[task.category] || CATEGORY_META.personal;
 
   const statusColor = {
     completed: '#10b981',
@@ -97,6 +98,11 @@ export default function TaskCard({ task, onUncheck, onComplete, onEdit, onDelete
 
           {/* Quick actions */}
           <div className="task-quick-actions" style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+            {onSkip && task.status !== 'completed' && (
+              <button className="btn btn-ghost btn-xs" onClick={() => onSkip(task.id)} title="Skip today" style={{ padding: '4px 6px', color: '#f59e0b', fontSize: 12 }}>
+                ⏭️ Skip
+              </button>
+            )}
             {onEdit && (
               <button className="btn btn-ghost btn-xs" onClick={() => onEdit(task)} title="Edit" style={{ padding: '4px 6px' }}><FaPencil /></button>
             )}

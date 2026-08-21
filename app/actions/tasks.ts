@@ -3,12 +3,15 @@
 import {
   completeTaskDb,
   deleteTaskDb,
+  softDeleteTaskDb,
+  restoreTaskDb,
   createTaskDb,
   uncheckTaskDb,
   editTaskDb,
   archiveTaskDb,
   recordTaskCompletionDb,
   createCustomCategoryDb,
+  skipTaskDb,
 } from '@/lib/db'
 import type { Task } from '@/lib/data'
 import { revalidatePath } from 'next/cache'
@@ -18,8 +21,23 @@ export async function completeTaskAction(id: string) {
   revalidatePath('/')
 }
 
+export async function skipTaskAction(id: string) {
+  skipTaskDb(id)
+  revalidatePath('/')
+}
+
 export async function deleteTaskAction(id: string) {
   deleteTaskDb(id)
+  revalidatePath('/')
+}
+
+export async function softDeleteTaskAction(id: string) {
+  softDeleteTaskDb(id)
+  revalidatePath('/')
+}
+
+export async function restoreTaskAction(id: string) {
+  restoreTaskDb(id)
   revalidatePath('/')
 }
 

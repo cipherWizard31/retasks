@@ -314,26 +314,77 @@ export function deleteExpiredSessions() {
 }
 
 import type { Task } from './data'
+import { calculateFirstDueDate, recalculateTaskStatus, calculateNextDueDate } from './recurrence'
 
-export function getTasks(): Task[] {
-  const rows = db.prepare('SELECT * FROM tasks').all() as unknown as Task[]
+export function getTasks(includeArchived: boolean = false): Task[] {
+  const query = includeArchived ? 'SELECT * FROM tasks' : 'SELECT * FROM tasks WHERE isArchived = 0'
+  const rows = db.prepare(query).all() as unknown as Task[]
+  return rows.map(row => ({ ...row }))
+}
+
+export function getArchivedTasks(): Task[] {
+  const rows = db.prepare('SELECT * FROM tasks WHERE isArchived = 1').all() as unknown as Task[]
   return rows.map(row => ({ ...row }))
 }
 
 export function completeTaskDb(id: string) {
-  db.prepare('UPDATE tasks SET status = ?, totalCompleted = totalCompleted + 1 WHERE id = ?').run('completed', id)
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as unknown as Task | undefined
+  const now = new Date().toISOString()
+  if (!task) {
+    db.prepare('UPDATE tasks SET status = ?, totalCompleted = totalCompleted + 1, updatedAt = ? WHERE id = ?').run(
+      'completed',
+      now,
+      id
+    )
+    return
+  }
+
+  const nextDueDate = calculateNextDueDate(task)
+  db.prepare(`
+    UPDATE tasks SET 
+      status = 'completed', 
+      totalCompleted = totalCompleted + 1, 
+      updatedAt = ? 
+    WHERE id = ?
+  `).run(now, id)
+}
+
+export function skipTaskDb(id: string) {
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as unknown as Task | undefined
+  if (!task) return
+
+  const nextDueDate = calculateNextDueDate(task)
+  const todayStr = new Date().toISOString().split('T')[0]
+  const newStatus = nextDueDate <= todayStr ? 'due' : 'upcoming'
+
+  db.prepare('UPDATE tasks SET startDate = ?, status = ?, totalMissed = totalMissed + 1, updatedAt = ? WHERE id = ?').run(
+    nextDueDate,
+    newStatus,
+    new Date().toISOString(),
+    id
+  )
 }
 
 export function uncheckTaskDb(id: string) {
-  db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run('due', id)
+  db.prepare('UPDATE tasks SET status = ?, updatedAt = ? WHERE id = ?').run('due', new Date().toISOString(), id)
 }
 
 export function deleteTaskDb(id: string) {
   db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
 }
 
+export function softDeleteTaskDb(id: string) {
+  db.prepare('UPDATE tasks SET isArchived = 1, updatedAt = ? WHERE id = ?').run(new Date().toISOString(), id)
+}
+
+export function restoreTaskDb(id: string) {
+  db.prepare('UPDATE tasks SET isArchived = 0, updatedAt = ? WHERE id = ?').run(new Date().toISOString(), id)
+}
+
 export function createTaskDb(input: Task) {
   const now = new Date().toISOString()
+  const initialStatus = input.status || calculateFirstDueDate(input.startDate)
+
   db.prepare(`
     INSERT INTO tasks (
       id, title, description, category, priority, status, repeatType, 
@@ -346,7 +397,7 @@ export function createTaskDb(input: Task) {
     input.description || null,
     input.category,
     input.priority,
-    input.status,
+    initialStatus,
     input.repeatType,
     input.repeatInterval || null,
     input.repeatUnit || null,
@@ -365,6 +416,8 @@ export function createTaskDb(input: Task) {
 
 export function editTaskDb(input: Task) {
   const now = new Date().toISOString()
+  const updatedStatus = recalculateTaskStatus(input)
+
   db.prepare(`
     UPDATE tasks SET
       title = ?, description = ?, category = ?, priority = ?,
@@ -382,7 +435,7 @@ export function editTaskDb(input: Task) {
     input.reminderTime || null,
     input.startDate,
     input.completionLogic,
-    input.status,
+    updatedStatus,
     input.isArchived ? 1 : 0,
     now,
     input.id
