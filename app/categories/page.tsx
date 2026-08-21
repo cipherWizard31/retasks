@@ -8,15 +8,37 @@ import { TASKS, CATEGORY_META, Category } from '../../lib/data';
 export default function CategoriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [catModalOpen, setCatModalOpen] = useState(false);
+  const [editingCatKey, setEditingCatKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<Category | null>(null);
 
   const [customLabel, setCustomLabel] = useState('');
   const [customIcon, setCustomIcon] = useState('📌');
   const [customColor, setCustomColor] = useState('#8b5cf6');
-  const [customCategories, setCustomCategories] = useState<Array<{ key: string; label: string; icon: string; color: string }>>([
+  const [customCategories, setCustomCategories] = useState<Array<{ key: string; label: string; icon: string; color: string }}>([
     { key: 'custom-projects', label: 'Projects', icon: '🚀', color: '#6366f1' },
     { key: 'custom-hobbies', label: 'Hobbies', icon: '🎨', color: '#ec4899' },
   ]);
+
+  const openNew = () => {
+    setEditingCatKey(null);
+    setCustomLabel('');
+    setCustomIcon('📌');
+    setCustomColor('#8b5cf6');
+    setCatModalOpen(true);
+  };
+
+  const openEdit = (cat: { key: string; label: string; icon: string; color: string }) => {
+    setEditingCatKey(cat.key);
+    setCustomLabel(cat.label);
+    setCustomIcon(cat.icon);
+    setCustomColor(cat.color);
+    setCatModalOpen(true);
+  };
+
+  const handleDeleteCustomCat = (key: string) => {
+    setCustomCategories(prev => prev.filter(c => c.key !== key));
+    if (selected === key as any) setSelected(null);
+  };
 
   const defaultCats = (Object.keys(CATEGORY_META) as Category[]).map(cat => {
     const catTasks = TASKS.filter(t => t.category === cat);
@@ -38,10 +60,14 @@ export default function CategoriesPage() {
 
   const allCategories = [...defaultCats, ...customCatsMapped];
 
-  const handleAddCategory = () => {
+  const handleSaveCategory = () => {
     if (!customLabel.trim()) return;
-    const newKey = `custom-${Date.now()}`;
-    setCustomCategories([...customCategories, { key: newKey, label: customLabel.trim(), icon: customIcon, color: customColor }]);
+    if (editingCatKey) {
+      setCustomCategories(prev => prev.map(c => c.key === editingCatKey ? { ...c, label: customLabel.trim(), icon: customIcon, color: customColor } : c));
+    } else {
+      const newKey = `custom-${Date.now()}`;
+      setCustomCategories(prev => [...prev, { key: newKey, label: customLabel.trim(), icon: customIcon, color: customColor }]);
+    }
     setCustomLabel('');
     setCatModalOpen(false);
   };
@@ -60,7 +86,7 @@ export default function CategoriesPage() {
               <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--muted)' }}>Organize your tasks by life area with default & custom categories</p>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button id="add-custom-cat-btn" className="btn btn-secondary" onClick={() => setCatModalOpen(true)}>
+              <button id="add-custom-cat-btn" className="btn btn-secondary" onClick={openNew}>
                 + New Category
               </button>
               <button id="categories-add-btn" className="btn btn-primary" onClick={() => setModalOpen(true)}>
@@ -86,14 +112,21 @@ export default function CategoriesPage() {
                 }}
               >
                 {isCustom && (
-                  <span
-                    style={{
-                      position: 'absolute', top: 12, right: 12, fontSize: 10, fontWeight: 700,
-                      padding: '2px 8px', borderRadius: 99, background: meta.color, color: 'white',
-                    }}
+                  <div
+                    style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 4 }}
+                    onClick={e => e.stopPropagation()}
                   >
-                    CUSTOM
-                  </span>
+                    <button
+                      title="Edit category"
+                      onClick={() => openEdit(customCategories.find(c => c.key === key)!)}
+                      style={{ background: meta.color, border: 'none', color: 'white', borderRadius: 6, width: 22, height: 22, cursor: 'pointer', fontSize: 11 }}
+                    >✏️</button>
+                    <button
+                      title="Delete category"
+                      onClick={() => handleDeleteCustomCat(key)}
+                      style={{ background: '#ef4444', border: 'none', color: 'white', borderRadius: 6, width: 22, height: 22, cursor: 'pointer', fontSize: 11 }}
+                    >✕</button>
+                  </div>
                 )}
                 <div style={{ fontSize: 32, marginBottom: 12 }}>{meta.icon}</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)', marginBottom: 4 }}>{meta.label}</div>
@@ -158,7 +191,7 @@ export default function CategoriesPage() {
         <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setCatModalOpen(false)}>
           <div className="modal-content animate-scale-in" style={{ maxWidth: 400, padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>New Custom Category</h3>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>{editingCatKey ? 'Edit Category' : 'New Custom Category'}</h3>
               <button
                 onClick={() => setCatModalOpen(false)}
                 style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted)' }}
@@ -222,8 +255,8 @@ export default function CategoriesPage() {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
                 <button className="btn btn-secondary" onClick={() => setCatModalOpen(false)}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleAddCategory} disabled={!customLabel.trim()}>
-                  Save Category
+                <button className="btn btn-primary" onClick={handleSaveCategory} disabled={!customLabel.trim()}>
+                  {editingCatKey ? 'Update Category' : 'Save Category'}
                 </button>
               </div>
             </div>

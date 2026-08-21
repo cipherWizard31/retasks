@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AppShell from '../components/AppShell';
 
 const NOTIFS = [
-  { id: '1', icon: '🌱', title: 'Water Plants', desc: 'This task is 1 day overdue', time: 'Now', type: 'overdue', color: '#ef4444', bg: '#fef2f2' },
-  { id: '2', icon: '✝️', title: 'Read Bible', desc: 'Reminder for today\'s task', time: '8:00 AM', type: 'due', color: '#f59e0b', bg: '#fffbeb' },
-  { id: '3', icon: '🏃', title: 'Morning Run', desc: 'Don\'t forget your daily run', time: '6:30 AM', type: 'due', color: '#f59e0b', bg: '#fffbeb' },
+  { id: '1', icon: '🌱', title: 'Water Plants', desc: "This task is 1 day overdue", time: 'Now', type: 'overdue', color: '#ef4444', bg: '#fef2f2' },
+  { id: '2', icon: '✝️', title: 'Read Bible', desc: "Reminder for today's task", time: '8:00 AM', type: 'due', color: '#f59e0b', bg: '#fffbeb' },
+  { id: '3', icon: '🏃', title: 'Morning Run', desc: "Don't forget your daily run", time: '6:30 AM', type: 'due', color: '#f59e0b', bg: '#fffbeb' },
   { id: '4', icon: '💰', title: 'Budget Review', desc: 'Weekly review due tomorrow', time: 'Tomorrow 10:00 AM', type: 'upcoming', color: '#0ea5e9', bg: '#f0f9ff' },
   { id: '5', icon: '📚', title: 'Review Flashcards', desc: 'Your daily study session', time: '7:00 PM', type: 'upcoming', color: '#8b5cf6', bg: '#faf5ff' },
   { id: '6', icon: '💻', title: 'Deep Work Block', desc: '2-hour focused work session', time: '9:00 AM', type: 'due', color: '#f59e0b', bg: '#fffbeb' },
@@ -16,10 +16,70 @@ export default function NotificationsPage() {
   const [notifs, setNotifs] = useState(NOTIFS);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [snoozed, setSnoozed] = useState<Set<string>>(new Set());
+  const [permStatus, setPermStatus] = useState<NotificationPermission | 'unsupported'>('default');
+  const [schedulerActive, setSchedulerActive] = useState(false);
+  const [schedulerLogs, setSchedulerLogs] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPermStatus(Notification.permission);
+    } else {
+      setPermStatus('unsupported');
+    }
+  }, []);
+
+  const requestPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    const result = await Notification.requestPermission();
+    setPermStatus(result);
+    if (result === 'granted') {
+      new Notification('ReTasks Notifications Enabled 🎉', {
+        body: "You'll now receive reminders for your tasks.",
+        icon: '/favicon.ico',
+      });
+      addLog('✅ Browser notifications enabled');
+    }
+  };
+
+  const sendTestNotification = () => {
+    if (permStatus !== 'granted') return;
+    new Notification('⏰ Task Reminder: Morning Run', {
+      body: "Your daily run is due today at 6:30 AM",
+      icon: '/favicon.ico',
+    });
+    addLog('🔔 Test notification sent');
+  };
+
+  const addLog = (msg: string) => {
+    const time = new Date().toLocaleTimeString();
+    setSchedulerLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 10));
+  };
+
+  const toggleScheduler = () => {
+    if (!schedulerActive) {
+      setSchedulerActive(true);
+      addLog('🚀 Reminder scheduler started');
+      addLog('📋 Loaded 6 active tasks');
+      addLog('⏱️ Next check: in 1 minute');
+    } else {
+      setSchedulerActive(false);
+      addLog('⏹️ Reminder scheduler stopped');
+    }
+  };
 
   const dismiss = (id: string) => setNotifs(prev => prev.filter(n => n.id !== id));
-  const complete = (id: string) => { setCompleted(prev => new Set([...prev, id])); setTimeout(() => dismiss(id), 1000); };
-  const snooze = (id: string) => setSnoozed(prev => new Set([...prev, id]));
+  const complete = (id: string) => {
+    setCompleted(prev => new Set([...prev, id]));
+    addLog(`✓ Task completed via notification`);
+    setTimeout(() => dismiss(id), 1000);
+  };
+  const snooze = (id: string) => {
+    setSnoozed(prev => new Set([...prev, id]));
+    addLog(`⏰ Task snoozed for 1 hour`);
+  };
+
+  const permColor = permStatus === 'granted' ? '#10b981' : permStatus === 'denied' ? '#ef4444' : '#f59e0b';
+  const permLabel = permStatus === 'granted' ? 'Enabled' : permStatus === 'denied' ? 'Blocked' : permStatus === 'unsupported' ? 'Unsupported' : 'Not Set';
 
   return (
     <AppShell>
@@ -27,20 +87,114 @@ export default function NotificationsPage() {
 
         <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: '#111827', letterSpacing: '-0.02em' }}>🔔 Notifications</h1>
-            <p style={{ margin: '4px 0 0', fontSize: 14, color: '#9ca3af' }}>{notifs.length} pending reminders</p>
+            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>🔔 Notifications</h1>
+            <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--muted)' }}>{notifs.length} pending reminders</p>
           </div>
           <button id="dismiss-all-btn" className="btn btn-secondary btn-sm" onClick={() => setNotifs([])}>Dismiss All</button>
         </div>
 
+        {/* Browser Notifications Permission Card */}
+        <div className="animate-fade-in delay-100 card" style={{ padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--foreground)' }}>🖥️ Browser Notifications</h2>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>Get native browser alerts for due tasks</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{
+                fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 99,
+                background: `${permColor}22`, color: permColor, border: `1px solid ${permColor}44`,
+              }}>
+                ● {permLabel}
+              </span>
+              {permStatus !== 'granted' && permStatus !== 'denied' && permStatus !== 'unsupported' && (
+                <button id="enable-notifs-btn" className="btn btn-primary btn-sm" onClick={requestPermission}>
+                  Enable Notifications
+                </button>
+              )}
+              {permStatus === 'granted' && (
+                <button id="test-notif-btn" className="btn btn-secondary btn-sm" onClick={sendTestNotification}>
+                  Send Test
+                </button>
+              )}
+              {permStatus === 'denied' && (
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>Enable in browser settings</span>
+              )}
+            </div>
+          </div>
+          {permStatus === 'granted' && (
+            <div style={{ padding: '10px 14px', background: 'var(--surface-muted)', borderRadius: 10, fontSize: 13, color: 'var(--muted)' }}>
+              ✅ ReTasks can send you native browser reminders when tasks are due.
+            </div>
+          )}
+        </div>
+
+        {/* Reminder Scheduler Card */}
+        <div className="animate-fade-in delay-150 card" style={{ padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--foreground)' }}>⏱️ Reminder Scheduler</h2>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>Automatically checks for due tasks and sends reminders</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{
+                fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 99,
+                background: schedulerActive ? '#10b98122' : 'var(--surface-muted)',
+                color: schedulerActive ? '#10b981' : 'var(--muted)',
+                border: schedulerActive ? '1px solid #10b98144' : '1px solid var(--border)',
+              }}>
+                {schedulerActive ? '● Running' : '○ Stopped'}
+              </span>
+              <button
+                id="toggle-scheduler-btn"
+                className={`btn btn-sm ${schedulerActive ? 'btn-secondary' : 'btn-primary'}`}
+                onClick={toggleScheduler}
+              >
+                {schedulerActive ? '⏹ Stop' : '▶ Start'}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+            {[
+              { label: 'Prevents Duplicates', icon: '🛡️', done: true },
+              { label: 'Runs Automatically', icon: '⚙️', done: schedulerActive },
+              { label: 'Web Push Ready', icon: '📡', done: false },
+            ].map(f => (
+              <div key={f.label} style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8,
+                background: f.done ? '#10b98111' : 'var(--surface-muted)',
+                border: f.done ? '1px solid #10b98133' : '1px solid var(--border)',
+                fontSize: 12, fontWeight: 600, color: f.done ? '#10b981' : 'var(--muted)',
+              }}>
+                <span>{f.icon}</span> {f.label}
+              </div>
+            ))}
+          </div>
+
+          {schedulerLogs.length > 0 && (
+            <div style={{
+              background: 'var(--surface-muted)', borderRadius: 8, padding: '10px 14px',
+              fontFamily: 'monospace', fontSize: 12, color: 'var(--muted)',
+              maxHeight: 120, overflowY: 'auto',
+            }}>
+              {schedulerLogs.map((log, i) => (
+                <div key={i} style={{ marginBottom: 4 }}>{log}</div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Notification list */}
         {notifs.length === 0 ? (
           <div className="empty-state">
             <div className="animate-float" style={{ fontSize: 64 }}>🔕</div>
-            <h3 style={{ margin: '16px 0 0', fontSize: 18, fontWeight: 700, color: '#111827' }}>All caught up!</h3>
-            <p style={{ margin: '8px 0 0', color: '#9ca3af', fontSize: 14 }}>No pending notifications right now.</p>
+            <h3 style={{ margin: '16px 0 0', fontSize: 18, fontWeight: 700, color: 'var(--foreground)' }}>All caught up!</h3>
+            <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 14 }}>No pending notifications right now.</p>
           </div>
         ) : (
-          <div className="animate-fade-in delay-100" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="animate-fade-in delay-200" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--foreground)' }}>Pending Reminders</h2>
             {notifs.map((notif, i) => {
               const isDone = completed.has(notif.id);
               const isSnoozed = snoozed.has(notif.id);
@@ -62,10 +216,10 @@ export default function NotificationsPage() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{notif.title}</div>
-                      <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>{notif.time}</span>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--foreground)' }}>{notif.title}</div>
+                      <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{notif.time}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{notif.desc}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{notif.desc}</div>
                     {isSnoozed && <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4, fontWeight: 600 }}>⏰ Snoozed for 1 hour</div>}
                     {!isDone && (
                       <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>

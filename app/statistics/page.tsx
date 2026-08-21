@@ -23,6 +23,17 @@ export default function StatisticsPage() {
   })).filter(d => d.count > 0);
   const totalCatTasks = catData.reduce((a, d) => a + d.count, 0);
 
+  // Generate heatmap cells for the last 16 weeks (112 days)
+  const heatCells = Array.from({ length: 112 }, (_, i) => {
+    const seed = (i * 7919 + 19) % 10;
+    if (seed < 3) return 0;
+    if (seed < 5) return 1;
+    if (seed < 7) return 2;
+    if (seed < 9) return 3;
+    return 4;
+  });
+  const heatLabels = ['16w ago', '12w ago', '8w ago', '4w ago', 'Now'];
+
   return (
     <AppShell>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -123,20 +134,46 @@ export default function StatisticsPage() {
           </div>
         </div>
 
-        {/* Per-task table */}
+        {/* Heatmap */}
         <div className="animate-fade-in delay-400 card" style={{ padding: '24px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#111827' }}>Task Leaderboard</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>Activity Heatmap</h3>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: 'var(--muted)' }}>
+              <span>Less</span>
+              {[0, 1, 2, 3, 4].map(l => (
+                <div key={l} className={`heatmap-cell heatmap-${l}`} style={{ display: 'inline-block' }} />
+              ))}
+              <span>More</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {heatCells.map((level, i) => (
+              <div
+                key={i}
+                className={`heatmap-cell heatmap-${level}`}
+                title={`${level > 0 ? level : 0} tasks completed`}
+              />
+            ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11, color: 'var(--muted)' }}>
+            {heatLabels.map(l => <span key={l}>{l}</span>)}
+          </div>
+        </div>
+
+        {/* Per-task table */}
+        <div className="animate-fade-in delay-500 card" style={{ padding: '24px' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>Task Leaderboard</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 100px', gap: 12, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 100px', gap: 12, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               <span>Task</span><span>Completed</span><span>Missed</span><span>Streak</span><span>Rate</span>
             </div>
             {TASKS.sort((a, b) => b.completionRate - a.completionRate).map((task, i) => (
               <div key={task.id} style={{
                 display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 100px', gap: 12,
-                padding: '10px 12px', borderRadius: 10, background: i % 2 === 0 ? '#f9fafb' : 'white',
+                padding: '10px 12px', borderRadius: 10, background: i % 2 === 0 ? 'var(--surface-muted)' : 'var(--surface)',
                 alignItems: 'center',
               }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   {i === 0 && <span>🥇</span>}
                   {i === 1 && <span>🥈</span>}
                   {i === 2 && <span>🥉</span>}

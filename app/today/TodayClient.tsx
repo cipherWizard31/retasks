@@ -1,37 +1,72 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import AppShell from '../components/AppShell';
 import CreateTaskModal from '../components/CreateTaskModal';
 import TaskCard from '../components/TaskCard';
 import { Task } from '../../lib/data';
+import { completeTaskAction, deleteTaskAction, skipTaskAction, uncheckTaskAction } from '../actions/tasks';
+
+const ONE_DAY = 24 * 60 * 60 * 1000;
+
+function getDateStr(daysFromNow: number) {
+  const d = new Date(Date.now() + daysFromNow * ONE_DAY);
+  return d.toISOString().split('T')[0];
+}
+
+function groupTasks(tasks: Task[]) {
+  const today = getDateStr(0);
+  const tomorrow = getDateStr(1);
+  const in2 = getDateStr(2);
+  const in3 = getDateStr(3);
+  const in7 = getDateStr(7);
+
+  const groups: { label: string; emoji: string; tasks: Task[]; color: string }[] = [
+    { label: 'Overdue', emoji: '🚨', tasks: tasks.filter(t => t.status === 'overdue'), color: '#ef4444' },
+    { label: 'Today', emoji: '☀️', tasks: tasks.filter(t => t.status === 'due' || (t.startDate === today && t.status !== 'overdue')), color: '#f59e0b' },
+    { label: 'Tomorrow', emoji: '🌅', tasks: tasks.filter(t => t.startDate === tomorrow && t.status === 'upcoming'), color: '#0ea5e9' },
+    { label: 'In 2 Days', emoji: '📆', tasks: tasks.filter(t => t.startDate === in2 && t.status === 'upcoming'), color: '#8b5cf6' },
+    { label: 'In 3 Days', emoji: '🗓️', tasks: tasks.filter(t => t.startDate === in3 && t.status === 'upcoming'), color: '#6366f1' },
+    { label: 'Within 1 Week', emoji: '📅', tasks: tasks.filter(t => t.startDate > in3 && t.startDate <= in7 && t.status === 'upcoming'), color: '#10b981' },
+  ];
+
+  return groups.filter(g => g.tasks.length > 0);
+}
 
 export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [filter, setFilter] = useState<'all' | 'due' | 'overdue' | 'completed'>('all');
+  const [isPending, startTransition] = useTransition();
 
-  const todayTasks = tasks.filter(t =>
-    t.status === 'due' || t.status === 'overdue' || t.status === 'completed'
-  );
-
-  const filteredTasks = filter === 'all' ? todayTasks : todayTasks.filter(t => t.status === filter);
-
-  const handleComplete = (id: string) =>
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'completed' as const } : t));
-  const handleDelete = (id: string) =>
-    setTasks(prev => prev.filter(t => t.id !== id));
-
-  const due = todayTasks.filter(t => t.status === 'due').length;
-  const overdue = todayTasks.filter(t => t.status === 'overdue').length;
-  const completed = todayTasks.filter(t => t.status === 'completed').length;
+  const groups = groupTasks(tasks);
+  const todayLike = tasks.filter(t => t.status === 'due' || t.status === 'overdue' || t.status === 'completed');
+  const due = todayLike.filter(t => t.status === 'due').length;
+  const overdue = todayLike.filter(t => t.status === 'overdue').length;
+  const completed = todayLike.filter(t => t.status === 'completed').length;
   const total = due + overdue + completed;
   const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  const handleComplete = (id: string) => {
+    startTransition(() => { completeTaskAction(id); });
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'completed' as const } : t));
+  };
+  const handleUncheck = (id: string) => {
+    startTransition(() => { uncheckTaskAction(id); });
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'due' as const } : t));
+  };
+  const handleSkip = (id: string) => {
+    startTransition(() => { skipTaskAction(id); });
+    setTasks(prev => prev.filter(t => t.id !== id));
+  };
+  const handleDelete = (id: string) => {
+    startTransition(() => { deleteTaskAction(id); });
+    setTasks(prev => prev.filter(t => t.id !== id));
+  };
 
   return (
     <>
       <AppShell onAddTask={() => setModalOpen(true)}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28, opacity: isPending ? 0.75 : 1 }}>
 
           {/* Header */}
           <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -78,41 +113,51 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
             </div>
           </div>
 
-          {/* Filter tabs */}
-          <div className="animate-fade-in delay-200" style={{ display: 'flex', gap: 6, padding: '4px', background: 'var(--surface-muted)', borderRadius: 12, width: 'fit-content' }}>
-            {(['all', 'due', 'overdue', 'completed'] as const).map(f => (
-              <button
-                key={f}
-                id={`filter-${f}`}
-                onClick={() => setFilter(f)}
-                style={{
-                  padding: '7px 16px', border: 'none', borderRadius: 10, cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
-                  background: filter === f ? 'var(--surface)' : 'transparent',
-                  color: filter === f ? 'var(--foreground)' : 'var(--muted)',
-                  boxShadow: filter === f ? 'var(--shadow-sm)' : 'none',
-                }}
-              >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-                {f !== 'all' && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700 }}>
-                  {f === 'due' ? due : f === 'overdue' ? overdue : completed}
-                </span>}
-              </button>
-            ))}
-          </div>
+          {/* Grouped Timeline */}
+          {groups.length === 0 ? (
+            <div className="empty-state">
+              <div className="animate-float" style={{ fontSize: 64 }}>🎉</div>
+              <h3 style={{ margin: '16px 0 0', fontSize: 18, fontWeight: 700, color: 'var(--foreground)' }}>All clear!</h3>
+              <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 14 }}>No upcoming tasks in the next week.</p>
+              <button className="btn btn-primary" style={{ marginTop: 20 }} onClick={() => setModalOpen(true)}>Create Task</button>
+            </div>
+          ) : (
+            groups.map(group => (
+              <section key={group.label} className="animate-fade-in">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                  <span style={{ fontSize: 18 }}>{group.emoji}</span>
+                  <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: group.color }}>
+                    {group.label}
+                  </h2>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
+                    background: `${group.color}22`, color: group.color,
+                  }}>
+                    {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
 
-          {/* Task list */}
-          <div className="animate-fade-in delay-300" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {filteredTasks.length === 0 ? (
-              <div className="empty-state">
-                <div className="animate-float" style={{ fontSize: 64 }}>🎉</div>
-                <h3 style={{ margin: '16px 0 0', fontSize: 18, fontWeight: 700, color: 'var(--foreground)' }}>All clear!</h3>
-                <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 14 }}>No tasks in this category.</p>
-              </div>
-            ) : filteredTasks.map((task) => (
-              <TaskCard key={task.id} task={task} onComplete={handleComplete} onEdit={() => {}} onDelete={handleDelete} />
-            ))}
-          </div>
+                <div style={{
+                  borderLeft: `3px solid ${group.color}44`,
+                  paddingLeft: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}>
+                  {group.tasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onComplete={handleComplete}
+                      onUncheck={handleUncheck}
+                      onSkip={handleSkip}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))
+          )}
         </div>
       </AppShell>
       {modalOpen && <CreateTaskModal onClose={() => setModalOpen(false)} />}

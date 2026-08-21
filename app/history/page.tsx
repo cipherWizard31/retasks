@@ -2,17 +2,22 @@
 
 import React, { useState } from 'react';
 import AppShell from '../components/AppShell';
-import { HISTORY_ENTRIES } from '../../lib/data';
+import { HISTORY_ENTRIES, HistoryEntry } from '../../lib/data';
 
 export default function HistoryPage() {
   const [selectedTask, setSelectedTask] = useState('Read Bible');
+  const [entries, setEntries] = useState<HistoryEntry[]>(HISTORY_ENTRIES);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const TASKS_LIST = ['Read Bible', 'Morning Run', 'Review Flashcards', 'Water Plants', 'Budget Review', 'Deep Work'];
 
-  const completed = HISTORY_ENTRIES.filter(e => e.completed).length;
-  const missed = HISTORY_ENTRIES.filter(e => !e.completed && !e.skipped).length;
-  const skipped = HISTORY_ENTRIES.filter(e => e.skipped).length;
-  const rate = Math.round((completed / HISTORY_ENTRIES.length) * 100);
+  const completed = entries.filter(e => e.completed).length;
+  const missed = entries.filter(e => !e.completed && !e.skipped).length;
+  const skipped = entries.filter(e => e.skipped).length;
+  const rate = entries.length > 0 ? Math.round((completed / entries.length) * 100) : 0;
+
+  const deleteEntry = (index: number) => setEntries(prev => prev.filter((_, i) => i !== index));
+  const clearAll = () => { setEntries([]); setConfirmClear(false); };
 
   // Build a heatmap-like grid for the last 12 weeks
   const heatCells: number[] = Array.from({ length: 84 }, (_, i) => {
@@ -33,6 +38,17 @@ export default function HistoryPage() {
           <select id="history-task-select" className="input" value={selectedTask} onChange={e => setSelectedTask(e.target.value)} style={{ width: 200 }}>
             {TASKS_LIST.map(t => <option key={t}>{t}</option>)}
           </select>
+          {entries.length > 0 && (
+            confirmClear ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--muted)' }}>Delete all history?</span>
+                <button className="btn btn-primary btn-sm" style={{ background: '#ef4444', borderColor: '#ef4444' }} onClick={clearAll}>Yes, delete</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => setConfirmClear(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button id="clear-history-btn" className="btn btn-secondary btn-sm" onClick={() => setConfirmClear(true)}>🗑️ Clear History</button>
+            )
+          )}
         </div>
 
         {/* Stats */}
@@ -84,9 +100,17 @@ export default function HistoryPage() {
 
         {/* Timeline */}
         <div className="animate-fade-in delay-300 card" style={{ padding: '24px' }}>
-          <h2 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700, color: '#111827' }}>Completion Timeline</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--foreground)' }}>Completion Timeline</h2>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>{entries.length} entries</span>
+          </div>
+          {entries.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)', fontSize: 14 }}>
+              No history entries yet.
+            </div>
+          ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {HISTORY_ENTRIES.map((entry, i) => (
+            {entries.map((entry, i) => (
               <div key={i} className="timeline-item">
                 <div style={{
                   position: 'absolute', left: 0, top: 8,
@@ -103,12 +127,12 @@ export default function HistoryPage() {
                   marginBottom: 12,
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '10px 14px',
-                  background: entry.completed ? '#f0fdf4' : entry.skipped ? '#fffbeb' : '#fef2f2',
+                  background: entry.completed ? 'color-mix(in srgb, #10b981 8%, var(--surface))' : entry.skipped ? 'color-mix(in srgb, #f59e0b 8%, var(--surface))' : 'color-mix(in srgb, #ef4444 8%, var(--surface))',
                   borderRadius: 10,
                 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{entry.date}</div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{selectedTask}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>{entry.date}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{selectedTask}</div>
                   </div>
                   <span style={{
                     fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
@@ -117,10 +141,18 @@ export default function HistoryPage() {
                   }}>
                     {entry.completed ? 'Completed' : entry.skipped ? 'Skipped' : 'Missed'}
                   </span>
+                  <button
+                    onClick={() => deleteEntry(i)}
+                    title="Delete this history entry"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, padding: '4px 6px', borderRadius: 6 }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
+                  >🗑️</button>
                 </div>
               </div>
             ))}
           </div>
+          )}
         </div>
       </div>
     </AppShell>
