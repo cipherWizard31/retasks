@@ -9,12 +9,10 @@ import { useAuth } from './auth-provider';
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: '⊞' },
   { href: '/today', label: 'Today', icon: '☀️' },
-  { href: '/upcoming', label: 'Upcoming', icon: '📅' },
   { href: '/calendar', label: 'Calendar', icon: '🗓️' },
   { href: '/history', label: 'History', icon: '📋' },
   { href: '/categories', label: 'Categories', icon: '🏷️' },
   { href: '/statistics', label: 'Statistics', icon: '📊' },
-  { href: '/templates', label: 'Templates', icon: '✨' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
@@ -251,16 +249,7 @@ export default function AppShell({ children, onAddTask }: AppShellProps) {
               <span className="tooltip">Notifications</span>
             </div>
 
-            {/* Avatar */}
-            <Link href="/settings">
-              <div style={{
-                width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
-                background: 'linear-gradient(135deg, #10b981, #0ea5e9)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'white', fontWeight: 700, fontSize: 14,
-                boxShadow: '0 2px 8px rgba(16,185,129,0.25)',
-              }}>{initials}</div>
-            </Link>
+            
           </div>
         </header>
 

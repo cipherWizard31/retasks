@@ -169,7 +169,7 @@ export function getTasks(): Task[] {
 }
 
 export function completeTaskDb(id: string) {
-  db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run('completed', id)
+  db.prepare('UPDATE tasks SET status = ?, totalCompleted = totalCompleted + 1 WHERE id = ?').run('completed', id)
 }
 
 export function uncheckTaskDb(id: string) {
