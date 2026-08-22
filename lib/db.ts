@@ -516,6 +516,10 @@ export function deleteTaskCompletionDb(id: string) {
   db.prepare('DELETE FROM task_completions WHERE id = ?').run(id)
 }
 
+export function clearAllTaskCompletionsDb() {
+  db.prepare('DELETE FROM task_completions').run()
+}
+
 export type CategoryRow = {
   id: string
   slug: string
@@ -543,6 +547,24 @@ export function createCustomCategoryDb(input: {
   return { id, slug, label: input.label, icon: input.icon, color: input.color, is_custom: 1, created_at: now }
 }
 
+export function editCustomCategoryDb(id: string, input: {
+  label: string
+  icon: string
+  color: string
+}) {
+  const slug = input.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || id
+  db.prepare(`
+    UPDATE categories
+    SET label = ?, icon = ?, color = ?, slug = ?
+    WHERE id = ?
+  `).run(input.label, input.icon, input.color, slug, id)
+}
+
+export function deleteCustomCategoryDb(id: string) {
+  db.prepare('DELETE FROM categories WHERE id = ?').run(id)
+}
+
 export function getCategoriesDb(): CategoryRow[] {
   return db.prepare('SELECT id, slug, label, icon, color, is_custom, created_at FROM categories ORDER BY is_custom ASC, label ASC').all() as unknown as CategoryRow[]
 }
+

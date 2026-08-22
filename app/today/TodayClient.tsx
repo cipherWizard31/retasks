@@ -5,7 +5,7 @@ import AppShell from '../components/AppShell';
 import CreateTaskModal from '../components/CreateTaskModal';
 import TaskCard from '../components/TaskCard';
 import { Task } from '../../lib/data';
-import { completeTaskAction, deleteTaskAction, skipTaskAction, uncheckTaskAction } from '../actions/tasks';
+import { completeTaskAction, deleteTaskAction, skipTaskAction, uncheckTaskAction, editTaskAction } from '../actions/tasks';
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
@@ -14,20 +14,40 @@ function getDateStr(daysFromNow: number) {
   return d.toISOString().split('T')[0];
 }
 
-function groupTasks(tasks: Task[]) {
+type SortOption = 'dueDate' | 'priority' | 'recentlyCreated' | 'alphabetical';
+
+function sortTasks(tasks: Task[], sortBy: SortOption): Task[] {
+  const sorted = [...tasks];
+  if (sortBy === 'priority') {
+    const pRank: Record<string, number> = { high: 1, medium: 2, low: 3 };
+    return sorted.sort((a, b) => (pRank[a.priority] || 4) - (pRank[b.priority] || 4));
+  }
+  if (sortBy === 'recentlyCreated') {
+    return sorted.sort((a, b) => (b.createdAt || b.startDate).localeCompare(a.createdAt || a.startDate));
+  }
+  if (sortBy === 'alphabetical') {
+    return sorted.sort((a, b) => a.title.localeCompare(b.title));
+  }
+  // Default: due date
+  return sorted.sort((a, b) => a.startDate.localeCompare(b.startDate));
+}
+
+function groupTasks(tasks: Task[], sortBy: SortOption) {
   const today = getDateStr(0);
   const tomorrow = getDateStr(1);
   const in2 = getDateStr(2);
   const in3 = getDateStr(3);
   const in7 = getDateStr(7);
 
+  const filterAndSort = (fn: (t: Task) => boolean) => sortTasks(tasks.filter(fn), sortBy);
+
   const groups: { label: string; emoji: string; tasks: Task[]; color: string }[] = [
-    { label: 'Overdue', emoji: '🚨', tasks: tasks.filter(t => t.status === 'overdue'), color: '#ef4444' },
-    { label: 'Today', emoji: '☀️', tasks: tasks.filter(t => t.status === 'due' || (t.startDate === today && t.status !== 'overdue')), color: '#f59e0b' },
-    { label: 'Tomorrow', emoji: '🌅', tasks: tasks.filter(t => t.startDate === tomorrow && t.status === 'upcoming'), color: '#0ea5e9' },
-    { label: 'In 2 Days', emoji: '📆', tasks: tasks.filter(t => t.startDate === in2 && t.status === 'upcoming'), color: '#8b5cf6' },
-    { label: 'In 3 Days', emoji: '🗓️', tasks: tasks.filter(t => t.startDate === in3 && t.status === 'upcoming'), color: '#6366f1' },
-    { label: 'Within 1 Week', emoji: '📅', tasks: tasks.filter(t => t.startDate > in3 && t.startDate <= in7 && t.status === 'upcoming'), color: '#10b981' },
+    { label: 'Overdue', emoji: '🚨', tasks: filterAndSort(t => t.status === 'overdue'), color: '#ef4444' },
+    { label: 'Today', emoji: '☀️', tasks: filterAndSort(t => t.status === 'due' || (t.startDate === today && t.status !== 'overdue')), color: '#f59e0b' },
+    { label: 'Tomorrow', emoji: '🌅', tasks: filterAndSort(t => t.startDate === tomorrow && t.status === 'upcoming'), color: '#0ea5e9' },
+    { label: 'In 2 Days', emoji: '📆', tasks: filterAndSort(t => t.startDate === in2 && t.status === 'upcoming'), color: '#8b5cf6' },
+    { label: 'In 3 Days', emoji: '🗓️', tasks: filterAndSort(t => t.startDate === in3 && t.status === 'upcoming'), color: '#6366f1' },
+    { label: 'Within 1 Week', emoji: '📅', tasks: filterAndSort(t => t.startDate > in3 && t.startDate <= in7 && t.status === 'upcoming'), color: '#10b981' },
   ];
 
   return groups.filter(g => g.tasks.length > 0);
@@ -35,10 +55,12 @@ function groupTasks(tasks: Task[]) {
 
 export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [sortBy, setSortBy] = useState<SortOption>('dueDate');
   const [isPending, startTransition] = useTransition();
 
-  const groups = groupTasks(tasks);
+  const groups = groupTasks(tasks, sortBy);
   const todayLike = tasks.filter(t => t.status === 'due' || t.status === 'overdue' || t.status === 'completed');
   const due = todayLike.filter(t => t.status === 'due').length;
   const overdue = todayLike.filter(t => t.status === 'overdue').length;
@@ -63,22 +85,47 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
     setTasks(prev => prev.filter(t => t.id !== id));
   };
 
+  const handleSaveEdit = (updated: Record<string, unknown>) => {
+    startTransition(() => { editTaskAction(updated as unknown as Task); });
+    setTasks(prev => prev.map(t => t.id === (updated as unknown as Task).id ? (updated as unknown as Task) : t));
+    setEditingTask(null);
+  };
+
   return (
     <>
       <AppShell onAddTask={() => setModalOpen(true)}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28, opacity: isPending ? 0.75 : 1 }}>
 
           {/* Header */}
-          <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
-                ☀️ Today
+                ☀️ Today & Timeline View
               </h1>
               <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--muted)' }}>
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               </p>
             </div>
-            <button id="today-add-btn" className="btn btn-primary" onClick={() => setModalOpen(true)}>+ Add Task</button>
+
+            {/* Controls: Sorting & Add */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Sort:</span>
+                <select
+                  id="task-sort-select"
+                  className="input"
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as SortOption)}
+                  style={{ width: 160, padding: '6px 12px' }}
+                >
+                  <option value="dueDate">📅 Due Date</option>
+                  <option value="priority">🔴 Priority</option>
+                  <option value="recentlyCreated">⚡ Recently Created</option>
+                  <option value="alphabetical">🔤 Alphabetical</option>
+                </select>
+              </div>
+              <button id="today-add-btn" className="btn btn-primary" onClick={() => setModalOpen(true)}>+ Add Task</button>
+            </div>
           </div>
 
           {/* Progress ring area */}
@@ -151,6 +198,7 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
                       onComplete={handleComplete}
                       onUncheck={handleUncheck}
                       onSkip={handleSkip}
+                      onEdit={() => setEditingTask(task)}
                       onDelete={handleDelete}
                     />
                   ))}
@@ -160,7 +208,13 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
           )}
         </div>
       </AppShell>
-      {modalOpen && <CreateTaskModal onClose={() => setModalOpen(false)} />}
+      {(modalOpen || editingTask) && (
+        <CreateTaskModal
+          initialTask={editingTask}
+          onClose={() => { setModalOpen(false); setEditingTask(null); }}
+          onSave={editingTask ? handleSaveEdit : undefined}
+        />
+      )}
     </>
   );
 }

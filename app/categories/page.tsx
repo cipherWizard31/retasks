@@ -1,84 +1,148 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import AppShell from '../components/AppShell';
 import CreateTaskModal from '../components/CreateTaskModal';
 import { TASKS, CATEGORY_META, Category } from '../../lib/data';
+import { fetchCategoriesAction, createCategoryAction, editCategoryAction, deleteCategoryAction } from '../actions/categories';
+
+interface CustomCat {
+  id: string;
+  key: string;
+  label: string;
+  icon: string;
+  color: string;
+}
+
+interface DisplayCategory {
+  key: string;
+  id: string;
+  meta: { label: string; icon: string; color: string; cssClass: string };
+  tasks: typeof TASKS;
+  rate: number;
+  isCustom: boolean;
+  rawCategory?: CustomCat;
+}
 
 export default function CategoriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [catModalOpen, setCatModalOpen] = useState(false);
-  const [editingCatKey, setEditingCatKey] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Category | null>(null);
+  const [editingCat, setEditingCat] = useState<{ id: string; label: string; icon: string; color: string } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const [customLabel, setCustomLabel] = useState('');
   const [customIcon, setCustomIcon] = useState('📌');
   const [customColor, setCustomColor] = useState('#8b5cf6');
-  const [customCategories, setCustomCategories] = useState<Array<{ key: string; label: string; icon: string; color: string }}>([
-    { key: 'custom-projects', label: 'Projects', icon: '🚀', color: '#6366f1' },
-    { key: 'custom-hobbies', label: 'Hobbies', icon: '🎨', color: '#ec4899' },
+  const [customCategories, setCustomCategories] = useState<CustomCat[]>([
+    { id: 'cat-1', key: 'custom-projects', label: 'Projects', icon: '🚀', color: '#6366f1' },
+    { id: 'cat-2', key: 'custom-hobbies', label: 'Hobbies', icon: '🎨', color: '#ec4899' },
   ]);
 
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const rows = await fetchCategoriesAction();
+        if (rows && rows.length > 0) {
+          const dbCustoms = rows.filter(r => r.is_custom).map(r => ({
+            id: r.id,
+            key: r.slug,
+            label: r.label,
+            icon: r.icon,
+            color: r.color,
+          }));
+          if (dbCustoms.length > 0) {
+            setCustomCategories(dbCustoms);
+          }
+        }
+      } catch (err) {
+        console.error('Failed loading categories from DB:', err);
+      }
+    };
+    loadCategories();
+  }, []);
+
   const openNew = () => {
-    setEditingCatKey(null);
+    setEditingCat(null);
     setCustomLabel('');
     setCustomIcon('📌');
     setCustomColor('#8b5cf6');
     setCatModalOpen(true);
   };
 
-  const openEdit = (cat: { key: string; label: string; icon: string; color: string }) => {
-    setEditingCatKey(cat.key);
+  const openEdit = (cat: CustomCat) => {
+    setEditingCat({ id: cat.id, label: cat.label, icon: cat.icon, color: cat.color });
     setCustomLabel(cat.label);
     setCustomIcon(cat.icon);
     setCustomColor(cat.color);
     setCatModalOpen(true);
   };
 
-  const handleDeleteCustomCat = (key: string) => {
-    setCustomCategories(prev => prev.filter(c => c.key !== key));
-    if (selected === key as any) setSelected(null);
+  const handleDeleteCustomCat = (catId: string, catKey: string) => {
+    setCustomCategories(prev => prev.filter(c => c.id !== catId && c.key !== catKey));
+    if (selected === catKey) setSelected(null);
+    startTransition(() => {
+      deleteCategoryAction(catId);
+    });
   };
 
-  const defaultCats = (Object.keys(CATEGORY_META) as Category[]).map(cat => {
+  const defaultCats: DisplayCategory[] = (Object.keys(CATEGORY_META) as Category[]).map(cat => {
     const catTasks = TASKS.filter(t => t.category === cat);
     const rate = catTasks.length > 0 ? Math.round(catTasks.reduce((a, t) => a + t.completionRate, 0) / catTasks.length) : 0;
-    return { key: cat, meta: CATEGORY_META[cat], tasks: catTasks, rate, isCustom: false };
+    return { key: cat, id: cat, meta: CATEGORY_META[cat], tasks: catTasks, rate, isCustom: false };
   });
 
-  const customCatsMapped = customCategories.map(c => {
+  const customCatsMapped: DisplayCategory[] = customCategories.map(c => {
     const catTasks = TASKS.filter(t => t.category === (c.key as any));
     const rate = catTasks.length > 0 ? Math.round(catTasks.reduce((a, t) => a + t.completionRate, 0) / catTasks.length) : 0;
     return {
       key: c.key,
+      id: c.id,
       meta: { label: c.label, icon: c.icon, color: c.color, cssClass: 'cat-custom' },
       tasks: catTasks,
       rate,
       isCustom: true,
+      rawCategory: c,
     };
   });
 
-  const allCategories = [...defaultCats, ...customCatsMapped];
+  const allCategories: DisplayCategory[] = [...defaultCats, ...customCatsMapped];
 
   const handleSaveCategory = () => {
     if (!customLabel.trim()) return;
-    if (editingCatKey) {
-      setCustomCategories(prev => prev.map(c => c.key === editingCatKey ? { ...c, label: customLabel.trim(), icon: customIcon, color: customColor } : c));
+    const label = customLabel.trim();
+    const icon = customIcon;
+    const color = customColor;
+
+    if (editingCat) {
+      const catId = editingCat.id;
+      setCustomCategories(prev => prev.map(c => c.id === catId ? { ...c, label, icon, color } : c));
+      startTransition(() => {
+        editCategoryAction(catId, { label, icon, color });
+      });
     } else {
-      const newKey = `custom-${Date.now()}`;
-      setCustomCategories(prev => [...prev, { key: newKey, label: customLabel.trim(), icon: customIcon, color: customColor }]);
+      const tempId = `custom-${Date.now()}`;
+      const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      setCustomCategories(prev => [...prev, { id: tempId, key: slug, label, icon, color }]);
+      startTransition(async () => {
+        const created = await createCategoryAction({ label, icon, color });
+        if (created) {
+          setCustomCategories(prev => prev.map(c => c.id === tempId ? { ...c, id: created.id, key: created.slug } : c));
+        }
+      });
     }
     setCustomLabel('');
     setCatModalOpen(false);
   };
 
-  const selectedCategoryMeta = allCategories.find(c => c.key === selected)?.meta;
+  const selectedCatObj = allCategories.find(c => c.key === selected || c.id === selected);
+  const selectedCategoryMeta = selectedCatObj?.meta;
   const filteredTasks = selected ? TASKS.filter(t => t.category === selected) : [];
 
   return (
     <>
       <AppShell onAddTask={() => setModalOpen(true)}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28, opacity: isPending ? 0.8 : 1 }}>
 
           <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <div>
@@ -97,12 +161,12 @@ export default function CategoriesPage() {
 
           {/* Category grid */}
           <div className="animate-fade-in delay-100" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            {allCategories.map(({ key, meta, tasks, rate, isCustom }, i) => (
+            {allCategories.map(({ key, id, meta, tasks, rate, isCustom, rawCategory }, i) => (
               <div
-                key={key}
-                id={`cat-card-${key}`}
+                key={key || id}
+                id={`cat-card-${key || id}`}
                 className={`card delay-${(i + 1) * 100}`}
-                onClick={() => setSelected(selected === key ? null : (key as Category))}
+                onClick={() => setSelected(selected === key ? null : key)}
                 style={{
                   padding: '20px', cursor: 'pointer',
                   border: selected === key ? `2px solid ${meta.color}` : '1px solid var(--border)',
@@ -111,20 +175,22 @@ export default function CategoriesPage() {
                   position: 'relative',
                 }}
               >
-                {isCustom && (
+                {isCustom && rawCategory && (
                   <div
                     style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 4 }}
                     onClick={e => e.stopPropagation()}
                   >
                     <button
+                      id={`edit-cat-${rawCategory.id}`}
                       title="Edit category"
-                      onClick={() => openEdit(customCategories.find(c => c.key === key)!)}
-                      style={{ background: meta.color, border: 'none', color: 'white', borderRadius: 6, width: 22, height: 22, cursor: 'pointer', fontSize: 11 }}
+                      onClick={() => openEdit(rawCategory)}
+                      style={{ background: meta.color, border: 'none', color: 'white', borderRadius: 6, width: 24, height: 24, cursor: 'pointer', fontSize: 11 }}
                     >✏️</button>
                     <button
+                      id={`delete-cat-${rawCategory.id}`}
                       title="Delete category"
-                      onClick={() => handleDeleteCustomCat(key)}
-                      style={{ background: '#ef4444', border: 'none', color: 'white', borderRadius: 6, width: 22, height: 22, cursor: 'pointer', fontSize: 11 }}
+                      onClick={() => handleDeleteCustomCat(rawCategory.id, rawCategory.key)}
+                      style={{ background: '#ef4444', border: 'none', color: 'white', borderRadius: 6, width: 24, height: 24, cursor: 'pointer', fontSize: 11 }}
                     >✕</button>
                   </div>
                 )}
@@ -170,7 +236,7 @@ export default function CategoriesPage() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--foreground)' }}>{task.title}</div>
                         <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                          🔁 {task.repeatType === 'daily' ? 'Every Day' : task.repeatType === 'weekly' ? 'Every Week' : `Every ${task.repeatInterval} days`} · 🕐 {task.reminderTime}
+                          🔁 {task.repeatType === 'daily' ? 'Every Day' : task.repeatType === 'weekly' ? 'Every Week' : `Every ${task.repeatInterval} days`} · 🕐 {task.reminderTime || 'No reminder'}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -191,7 +257,9 @@ export default function CategoriesPage() {
         <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setCatModalOpen(false)}>
           <div className="modal-content animate-scale-in" style={{ maxWidth: 400, padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>{editingCatKey ? 'Edit Category' : 'New Custom Category'}</h3>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>
+                {editingCat ? 'Edit Category' : 'New Custom Category'}
+              </h3>
               <button
                 onClick={() => setCatModalOpen(false)}
                 style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--muted)' }}
@@ -204,6 +272,7 @@ export default function CategoriesPage() {
                   Category Label
                 </label>
                 <input
+                  id="category-label-input"
                   className="input"
                   placeholder="e.g. Gardening, Fitness, Reading"
                   value={customLabel}
@@ -216,8 +285,8 @@ export default function CategoriesPage() {
                 <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>
                   Category Emoji Icon
                 </label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {['🌱', '🎨', '🚀', '🎸', '⚽', '🧪', '✈️', '💻', '💡'].map(icon => (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {['🌱', '🎨', '🚀', '🎸', '⚽', '🧪', '✈️', '💻', '💡', '📚', '🎯', '🏋️'].map(icon => (
                     <button
                       key={icon}
                       type="button"
@@ -239,7 +308,7 @@ export default function CategoriesPage() {
                   Category Color
                 </label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#06b6d4'].map(color => (
+                  {['#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#06b6d4', '#6366f1'].map(color => (
                     <button
                       key={color}
                       type="button"
@@ -255,8 +324,8 @@ export default function CategoriesPage() {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
                 <button className="btn btn-secondary" onClick={() => setCatModalOpen(false)}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleSaveCategory} disabled={!customLabel.trim()}>
-                  {editingCatKey ? 'Update Category' : 'Save Category'}
+                <button id="save-category-btn" className="btn btn-primary" onClick={handleSaveCategory} disabled={!customLabel.trim()}>
+                  {editingCat ? 'Update Category' : 'Save Category'}
                 </button>
               </div>
             </div>

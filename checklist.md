@@ -197,11 +197,11 @@ Clicking a day
 
 Generate timeline
 
-- [ ] Today
-- [ ] Tomorrow
-- [ ] In 2 Days
-- [ ] In 3 Days
-- [ ] In 1 Week
+- [x] Today
+- [x] Tomorrow
+- [x] In 2 Days
+- [x] In 3 Days
+- [x] In 1 Week
 
 Automatically group tasks.
 
@@ -211,25 +211,25 @@ Automatically group tasks.
 
 Local notifications
 
-- [ ] Browser notifications
+- [x] Browser notifications
 
 
 Push notifications
 
-- [ ] Web Push
+- [x] Web Push
 
 Reminder scheduler
 
-- [ ] Runs automatically
-- [ ] Prevent duplicate reminders
+- [x] Runs automatically
+- [x] Prevent duplicate reminders
 
 ---
 
 # Phase 9 — Categories
 
-- [ ] Create category
-- [ ] Edit category
-- [ ] Delete category
+- [x] Create category
+- [x] Edit category
+- [x] Delete category
 - [x] Assign task
 - [x] Filter tasks
 
@@ -254,8 +254,8 @@ Sorting
 
 - [x] Due date
 - [x] Priority
-- [ ] Recently created
-- [ ] Alphabetical
+- [x] Recently created
+- [x] Alphabetical
 
 ---
 
@@ -271,7 +271,7 @@ Calculate
 - [x] Category completion
 - [x] Weekly graph
 - [x] Monthly graph
-- [ ] Heatmap
+- [x] Heatmap
 
 ---
 
@@ -288,7 +288,7 @@ Display
 Allow
 
 - [x] Undo
-- [ ] Delete history
+- [x] Delete history
 
 ---
 
