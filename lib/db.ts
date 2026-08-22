@@ -313,10 +313,82 @@ export function deleteExpiredSessions() {
   db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(new Date().toISOString())
 }
 
-import type { Task } from './data'
+import { TASKS, type Task } from './data'
 import { calculateFirstDueDate, recalculateTaskStatus, calculateNextDueDate } from './recurrence'
 
+function seedInitialTasks() {
+  const now = new Date().toISOString()
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO tasks (
+      id, title, description, category, priority, status, repeatType, 
+      repeatInterval, repeatUnit, reminderTime, startDate, completionLogic, 
+      completionRate, streak, totalCompleted, totalMissed, isArchived, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+
+  for (const t of TASKS) {
+    const status = calculateFirstDueDate(t.startDate)
+    insert.run(
+      t.id, t.title, t.description || null, t.category, t.priority,
+      status, t.repeatType, t.repeatInterval || null, t.repeatUnit || null,
+      t.reminderTime || null, t.startDate, t.completionLogic,
+      t.completionRate || 0, t.streak || 0, t.totalCompleted || 0, t.totalMissed || 0,
+      0, now, now
+    )
+  }
+}
+
+function refreshRecurringTaskStatuses() {
+  const todayStr = new Date().toISOString().split('T')[0]
+  const now = new Date().toISOString()
+
+  // 1. Reset tasks completed on previous days
+  const completedRows = db.prepare("SELECT * FROM tasks WHERE status = 'completed' AND isArchived = 0").all() as unknown as Task[]
+
+  for (const task of completedRows) {
+    if (!task.repeatType) {
+      continue
+    }
+
+    const lastCompletion = db.prepare('SELECT completion_date FROM task_completions WHERE task_id = ? ORDER BY completed_at DESC LIMIT 1').get(task.id) as { completion_date: string } | undefined
+
+    const completionDate = lastCompletion?.completion_date || (task.updatedAt ? task.updatedAt.split('T')[0] : task.startDate)
+
+    if (completionDate && todayStr > completionDate) {
+      let nextDue = task.startDate
+      if (task.startDate <= completionDate) {
+        nextDue = calculateNextDueDate(task, completionDate)
+      }
+      const newStatus = nextDue <= todayStr ? 'due' : 'upcoming'
+
+      db.prepare('UPDATE tasks SET status = ?, startDate = ?, updatedAt = ? WHERE id = ?').run(
+        newStatus,
+        nextDue,
+        now,
+        task.id
+      )
+    }
+  }
+
+  // 2. Mark overdue or due tasks according to current start date
+  const activeRows = db.prepare("SELECT * FROM tasks WHERE status IN ('due', 'upcoming', 'overdue') AND isArchived = 0").all() as unknown as Task[]
+
+  for (const task of activeRows) {
+    if (task.startDate < todayStr && task.status !== 'overdue') {
+      db.prepare("UPDATE tasks SET status = 'overdue', updatedAt = ? WHERE id = ?").run(now, task.id)
+    } else if (task.startDate === todayStr && task.status === 'upcoming') {
+      db.prepare("UPDATE tasks SET status = 'due', updatedAt = ? WHERE id = ?").run(now, task.id)
+    }
+  }
+}
+
 export function getTasks(includeArchived: boolean = false): Task[] {
+  const count = (db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number }).count
+  if (count === 0) {
+    seedInitialTasks()
+  }
+  refreshRecurringTaskStatuses()
+
   const query = includeArchived ? 'SELECT * FROM tasks' : 'SELECT * FROM tasks WHERE isArchived = 0'
   const rows = db.prepare(query).all() as unknown as Task[]
   return rows.map(row => ({ ...row }))
@@ -330,20 +402,23 @@ export function getArchivedTasks(): Task[] {
 export function completeTaskDb(id: string) {
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as unknown as Task | undefined
   const now = new Date().toISOString()
-  if (!task) {
-    db.prepare('UPDATE tasks SET status = ?, totalCompleted = totalCompleted + 1, updatedAt = ? WHERE id = ?').run(
-      'completed',
-      now,
-      id
-    )
-    return
+  const todayStr = now.split('T')[0]
+
+  if (task) {
+    const existing = db.prepare('SELECT id FROM task_completions WHERE task_id = ? AND completion_date = ?').get(id, todayStr)
+    if (!existing) {
+      db.prepare(`
+        INSERT INTO task_completions (id, task_id, completion_date, completed_at)
+        VALUES (?, ?, ?, ?)
+      `).run(randomUUID(), id, todayStr, now)
+    }
   }
 
-  const nextDueDate = calculateNextDueDate(task)
   db.prepare(`
     UPDATE tasks SET 
       status = 'completed', 
       totalCompleted = totalCompleted + 1, 
+      streak = streak + 1,
       updatedAt = ? 
     WHERE id = ?
   `).run(now, id)
@@ -366,7 +441,15 @@ export function skipTaskDb(id: string) {
 }
 
 export function uncheckTaskDb(id: string) {
-  db.prepare('UPDATE tasks SET status = ?, updatedAt = ? WHERE id = ?').run('due', new Date().toISOString(), id)
+  const now = new Date().toISOString()
+  const todayStr = now.split('T')[0]
+
+  db.prepare('DELETE FROM task_completions WHERE task_id = ? AND completion_date = ?').run(id, todayStr)
+
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as unknown as Task | undefined
+  const newStatus = task ? (task.startDate < todayStr ? 'overdue' : task.startDate === todayStr ? 'due' : 'upcoming') : 'due'
+
+  db.prepare('UPDATE tasks SET status = ?, streak = MAX(0, streak - 1), updatedAt = ? WHERE id = ?').run(newStatus, now, id)
 }
 
 export function deleteTaskDb(id: string) {
