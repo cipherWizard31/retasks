@@ -130,19 +130,6 @@ export default function TaskCard({ task, onUncheck, onComplete, onSkip, onEdit, 
             <BiRepeat /> {repeatLabel()}
           </span>
         </div>
-
-        {/* Progress bar */}
-        {!compact && (
-          <div style={{ marginTop: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>Completion Rate</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>{task.completionRate}%</span>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${task.completionRate}%` }} />
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

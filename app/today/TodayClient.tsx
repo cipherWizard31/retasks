@@ -136,7 +136,7 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
           <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
-                ☀️ Today & Timeline View
+                ☀️ Today
               </h1>
               <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--muted)' }}>
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
@@ -201,7 +201,7 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
             <div className="empty-state">
               <div className="animate-float" style={{ fontSize: 64 }}>🎉</div>
               <h3 style={{ margin: '16px 0 0', fontSize: 18, fontWeight: 700, color: 'var(--foreground)' }}>All clear!</h3>
-              <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 14 }}>No upcoming tasks in the next week.</p>
+              <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 14 }}>You have no tasks scheduled for today!</p>
               <button className="btn btn-primary" style={{ marginTop: 20 }} onClick={() => setModalOpen(true)}>Create Task</button>
             </div>
           ) : (
