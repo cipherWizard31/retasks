@@ -1,18 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useTransition } from 'react';
 import { useTheme } from 'next-themes';
 import AppShell from '../components/AppShell';
 import { applyAccentColor, ACCENT_COLORS } from '../components/theme-provider';
 import { useAuth } from '../components/auth-provider';
 import { logout } from '@/app/actions/auth';
+import { TASKS, Task } from '@/lib/data';
+import { exportTasksToJSON, exportTasksToCSV, exportFullBackup, parseImportTasks } from '@/lib/data-management';
+import { createTaskAction } from '@/app/actions/tasks';
+import { updateProfile } from '@/app/actions/auth';
 
 const SETTINGS_SECTIONS = [
-  { id: 'profile', label: 'Profile', icon: '👤' },
+  { id: 'profile', label: 'Profile & Account', icon: '👤' },
   { id: 'appearance', label: 'Appearance', icon: '🎨' },
   { id: 'notifications', label: 'Notifications', icon: '🔔' },
-  { id: 'schedule', label: 'Schedule & Time', icon: '⏰' },
-  { id: 'data', label: 'Data & Privacy', icon: '🔒' },
+  { id: 'schedule', label: 'Schedule & Defaults', icon: '⏰' },
+  { id: 'data', label: 'Data Management', icon: '💾' },
+  { id: 'security', label: 'Security & Privacy', icon: '🛡️' },
 ];
 
 const THEME_OPTIONS = [
@@ -26,21 +31,39 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [activeSection, setActiveSection] = useState('appearance');
   const user = useAuth();
+  const [isPending, startTransition] = useTransition();
+
+  // Settings State
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [timezone, setTimezone] = useState('America/New_York');
+  const [timezone, setTimezone] = useState(user?.timezone || 'America/New_York');
   const [defaultRepeat, setDefaultRepeat] = useState('daily');
+  const [defaultReminder, setDefaultReminder] = useState('08:00 AM');
   const [notifEnabled, setNotifEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [overdueAlerts, setOverdueAlerts] = useState(true);
   const [reminderBefore, setReminderBefore] = useState('15');
   const [weekStart, setWeekStart] = useState('Sunday');
   const [saved, setSaved] = useState(false);
   const [accentColor, setAccentColor] = useState('#10b981');
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
     const savedAccent = localStorage.getItem('app-accent-color') || '#10b981';
+    const savedTimezone = localStorage.getItem('app-timezone') || user?.timezone || 'America/New_York';
+    const savedRepeat = localStorage.getItem('app-default-repeat') || 'daily';
+    const savedReminder = localStorage.getItem('app-default-reminder') || '08:00 AM';
+
     setAccentColor(savedAccent);
     applyAccentColor(savedAccent);
+    setTimezone(savedTimezone);
+    setDefaultRepeat(savedRepeat);
+    setDefaultReminder(savedReminder);
+
     if (user?.name) setName(user.name);
     if (user?.email) setEmail(user.email);
   }, [user]);
@@ -56,8 +79,54 @@ export default function SettingsPage() {
   };
 
   const handleSave = () => {
+    localStorage.setItem('app-timezone', timezone);
+    localStorage.setItem('app-default-repeat', defaultRepeat);
+    localStorage.setItem('app-default-reminder', defaultReminder);
+
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set('name', name);
+      formData.set('email', email);
+      formData.set('timezone', timezone);
+      await updateProfile(undefined, formData);
+    });
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  // Data Management Handlers
+  const handleExportJSON = () => exportTasksToJSON(TASKS);
+  const handleExportCSV = () => exportTasksToCSV(TASKS);
+  const handleExportBackup = () => exportFullBackup(TASKS);
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>, isBackup = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const isCsv = file.name.endsWith('.csv');
+        const importedTasks = parseImportTasks(text, isCsv);
+
+        if (importedTasks.length > 0) {
+          startTransition(() => {
+            importedTasks.forEach(task => {
+              createTaskAction(task);
+            });
+          });
+          setImportStatus(`Successfully imported ${importedTasks.length} task(s)! 🎉`);
+        } else {
+          setImportStatus('No valid tasks found in file.');
+        }
+      } catch (err) {
+        setImportStatus('Failed to parse import file.');
+      }
+      setTimeout(() => setImportStatus(null), 4000);
+    };
+    reader.readAsText(file);
   };
 
   const selectedTheme = mounted ? theme : undefined;
@@ -65,6 +134,7 @@ export default function SettingsPage() {
   const Toggle = ({ enabled, onChange, id }: { enabled: boolean; onChange: () => void; id: string }) => (
     <button
       id={id}
+      type="button"
       onClick={onChange}
       style={{
         width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
@@ -82,22 +152,23 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24, opacity: isPending ? 0.8 : 1 }}>
 
         {/* Header */}
         <div className="animate-fade-in">
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>⚙️ Settings</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--muted)' }}>Manage your account and preferences</p>
+          <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--muted)' }}>Manage account, theme, notifications, data export, and security</p>
         </div>
 
         <div className="animate-fade-in delay-100" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20 }}>
 
-          {/* Sidebar */}
+          {/* Sidebar Navigation */}
           <div className="card" style={{ padding: '12px', height: 'fit-content' }}>
             {SETTINGS_SECTIONS.map(sec => (
               <button
                 key={sec.id}
                 id={`settings-${sec.id}`}
+                type="button"
                 onClick={() => setActiveSection(sec.id)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10,
@@ -114,15 +185,16 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          {/* Content */}
+          {/* Content Panel */}
           <div className="card animate-scale-in" style={{ padding: '28px' }}>
 
+            {/* Profile Section */}
             {activeSection === 'profile' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Profile Settings</h2>
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Account & Profile</h2>
                   <a href="/profile" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
-                    Open Full Profile Page 👤
+                    Open Full Profile 👤
                   </a>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -152,13 +224,10 @@ export default function SettingsPage() {
                     <input id="settings-email" className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} />
                   </div>
                 </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>Bio</label>
-                  <textarea id="settings-bio" className="input" placeholder="A short bio…" rows={3} style={{ fontFamily: 'inherit', resize: 'vertical' }} />
-                </div>
               </div>
             )}
 
+            {/* Appearance Section */}
             {activeSection === 'appearance' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Appearance</h2>
@@ -173,7 +242,6 @@ export default function SettingsPage() {
                           id={`theme-${option.id}`}
                           type="button"
                           onClick={() => handleThemeChange(option.id)}
-                          aria-pressed={isActive}
                           style={{
                             padding: 12,
                             border: `2px solid ${isActive ? 'var(--accent-color)' : 'var(--border-strong)'}`,
@@ -188,39 +256,15 @@ export default function SettingsPage() {
                           }}
                         >
                           <div style={{
-                            height: 56,
-                            borderRadius: 8,
-                            background: option.preview,
-                            border: `1px solid ${option.accent}`,
-                            position: 'relative',
-                            overflow: 'hidden',
+                            height: 56, borderRadius: 8, background: option.preview,
+                            border: `1px solid ${option.accent}`, position: 'relative', overflow: 'hidden',
                           }}>
-                            <div style={{
-                              position: 'absolute', left: 8, top: 8, bottom: 8, width: 14,
-                              borderRadius: 4,
-                              background: option.id === 'light' ? '#ffffff' : option.id === 'dark' ? '#1e293b' : 'linear-gradient(180deg, #ffffff 50%, #1e293b 50%)',
-                              border: `1px solid ${option.accent}`,
-                            }} />
-                            <div style={{
-                              position: 'absolute', left: 28, top: 12, right: 8, height: 8,
-                              borderRadius: 4,
-                              background: option.id === 'dark' ? '#334155' : option.id === 'light' ? '#e5e7eb' : '#94a3b8',
-                            }} />
-                            <div style={{
-                              position: 'absolute', left: 28, top: 26, right: 18, height: 6,
-                              borderRadius: 4,
-                              background: option.id === 'dark' ? '#475569' : option.id === 'light' ? '#f1f5f9' : '#64748b',
-                            }} />
+                            <div style={{ position: 'absolute', left: 8, top: 8, bottom: 8, width: 14, borderRadius: 4, background: option.id === 'light' ? '#ffffff' : option.id === 'dark' ? '#1e293b' : 'linear-gradient(180deg, #ffffff 50%, #1e293b 50%)', border: `1px solid ${option.accent}` }} />
+                            <div style={{ position: 'absolute', left: 28, top: 12, right: 8, height: 8, borderRadius: 4, background: option.id === 'dark' ? '#334155' : option.id === 'light' ? '#e5e7eb' : '#94a3b8' }} />
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                             <span style={{ fontSize: 16 }}>{option.icon}</span>
-                            <span style={{
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: isActive ? 'var(--accent-color-dark)' : 'var(--muted-foreground)',
-                            }}>
-                              {option.label}
-                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: isActive ? 'var(--accent-color-dark)' : 'var(--muted-foreground)' }}>{option.label}</span>
                           </div>
                         </button>
                       );
@@ -235,16 +279,12 @@ export default function SettingsPage() {
                       <button
                         key={color.hex}
                         type="button"
-                        aria-label={`Accent ${color.name}`}
                         onClick={() => handleAccentChange(color.hex)}
                         style={{
                           width: 36, height: 36, borderRadius: '50%', background: color.hex, cursor: 'pointer',
                           border: color.hex === accentColor ? '3px solid var(--foreground)' : '3px solid transparent',
-                          transition: 'transform 0.15s',
                           padding: 0,
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.15)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                       />
                     ))}
                   </div>
@@ -252,14 +292,14 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* Notifications Section */}
             {activeSection === 'notifications' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Notifications</h2>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Notification Settings</h2>
                 {[
-                  { id: 'notif-enable', label: 'Enable Notifications', desc: 'Receive reminders for due tasks', state: notifEnabled, toggle: () => setNotifEnabled(!notifEnabled) },
-                  { id: 'notif-sound', label: 'Sound Alerts', desc: 'Play sound when notification fires', state: true, toggle: () => {} },
-                  { id: 'notif-badge', label: 'Badge Count', desc: 'Show unread count on app icon', state: true, toggle: () => {} },
-                  { id: 'notif-overdue', label: 'Overdue Alerts', desc: 'Get notified when tasks are overdue', state: true, toggle: () => {} },
+                  { id: 'notif-enable', label: 'Enable Local Notifications', desc: 'Receive reminders for due tasks', state: notifEnabled, toggle: () => setNotifEnabled(!notifEnabled) },
+                  { id: 'notif-sound', label: 'Sound Alerts', desc: 'Play audio chime when reminder fires', state: soundEnabled, toggle: () => setSoundEnabled(!soundEnabled) },
+                  { id: 'notif-overdue', label: 'Overdue Alerts', desc: 'Get immediate notifications when tasks pass due date', state: overdueAlerts, toggle: () => setOverdueAlerts(!overdueAlerts) },
                 ].map(item => (
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: 'var(--surface-muted)', borderRadius: 12 }}>
                     <div>
@@ -270,91 +310,135 @@ export default function SettingsPage() {
                   </div>
                 ))}
                 <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>Reminder Before Due</label>
-                  <select id="reminder-before-select" className="input" value={reminderBefore} onChange={e => setReminderBefore(e.target.value)} style={{ maxWidth: 200 }}>
-                    <option value="5">5 minutes</option>
-                    <option value="15">15 minutes</option>
-                    <option value="30">30 minutes</option>
-                    <option value="60">1 hour</option>
-                    <option value="1440">1 day</option>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>Default Reminder Lead Time</label>
+                  <select id="reminder-before-select" className="input" value={reminderBefore} onChange={e => setReminderBefore(e.target.value)} style={{ maxWidth: 220 }}>
+                    <option value="5">5 minutes before</option>
+                    <option value="15">15 minutes before</option>
+                    <option value="30">30 minutes before</option>
+                    <option value="60">1 hour before</option>
                   </select>
                 </div>
               </div>
             )}
 
+            {/* Schedule & Defaults Section */}
             {activeSection === 'schedule' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Schedule & Time</h2>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Schedule & Defaults</h2>
                 <div>
                   <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>Time Zone</label>
                   <select id="timezone-select" className="input" value={timezone} onChange={e => setTimezone(e.target.value)}>
-                    <option value="America/New_York">Eastern Time (ET)</option>
-                    <option value="America/Chicago">Central Time (CT)</option>
-                    <option value="America/Denver">Mountain Time (MT)</option>
-                    <option value="America/Los_Angeles">Pacific Time (PT)</option>
-                    <option value="Europe/London">GMT/UTC</option>
-                    <option value="Europe/Berlin">Central European Time</option>
-                    <option value="Asia/Tokyo">Japan Standard Time</option>
+                    <option value="America/New_York">Eastern Time (ET - America/New_York)</option>
+                    <option value="America/Chicago">Central Time (CT - America/Chicago)</option>
+                    <option value="America/Denver">Mountain Time (MT - America/Denver)</option>
+                    <option value="America/Los_Angeles">Pacific Time (PT - America/Los_Angeles)</option>
+                    <option value="Europe/London">GMT / UTC (Europe/London)</option>
+                    <option value="Europe/Paris">Central European Time (Europe/Paris)</option>
+                    <option value="Asia/Tokyo">Japan Standard Time (Asia/Tokyo)</option>
                   </select>
                 </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>Default Repeat Type</label>
-                  <select id="default-repeat-select" className="input" value={defaultRepeat} onChange={e => setDefaultRepeat(e.target.value)} style={{ maxWidth: 200 }}>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="every_x_days">Every X Days</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>Week Starts On</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {['Sunday', 'Monday'].map(day => (
-                      <button
-                        key={day}
-                        id={`week-start-${day.toLowerCase()}`}
-                        type="button"
-                        onClick={() => setWeekStart(day)}
-                        style={{
-                          padding: '8px 20px',
-                          border: `1.5px solid ${weekStart === day ? 'var(--accent-color)' : 'var(--border-strong)'}`,
-                          borderRadius: 10,
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          fontSize: 13,
-                          background: weekStart === day ? 'var(--accent-color-light)' : 'var(--surface)',
-                          color: weekStart === day ? 'var(--accent-color-dark)' : 'var(--muted-foreground)',
-                        }}
-                      >{day}</button>
-                    ))}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>Default Repeat Type</label>
+                    <select id="default-repeat-select" className="input" value={defaultRepeat} onChange={e => setDefaultRepeat(e.target.value)}>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="every_x_days">Every X Days</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted-foreground)', display: 'block', marginBottom: 6 }}>Default Reminder Time</label>
+                    <input id="default-reminder-input" className="input" type="time" value="08:00" onChange={e => setDefaultReminder(e.target.value)} />
                   </div>
                 </div>
               </div>
             )}
 
+            {/* Data Management Section */}
             {activeSection === 'data' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Data & Privacy</h2>
-                <div style={{ background: 'color-mix(in srgb, #0ea5e9 12%, var(--surface))', border: '1px solid color-mix(in srgb, #0ea5e9 30%, var(--border))', borderRadius: 12, padding: '16px' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0284c7', marginBottom: 4 }}>📦 Export Data</div>
-                  <div style={{ fontSize: 13, color: 'var(--muted-foreground)', marginBottom: 12 }}>Download all your tasks and history as JSON or CSV.</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button id="export-json-btn" className="btn btn-secondary btn-sm">Export JSON</button>
-                    <button id="export-csv-btn" className="btn btn-secondary btn-sm">Export CSV</button>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Data Management</h2>
+
+                {importStatus && (
+                  <div style={{ padding: '12px 16px', background: 'color-mix(in srgb, #10b981 15%, var(--surface))', border: '1px solid #10b98144', borderRadius: 10, fontSize: 13, fontWeight: 600, color: '#10b981' }}>
+                    {importStatus}
+                  </div>
+                )}
+
+                {/* Export Card */}
+                <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)', marginBottom: 4 }}>📤 Export Tasks</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>Export all your active tasks and metadata into JSON or CSV format.</div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button id="export-json-btn" className="btn btn-secondary btn-sm" onClick={handleExportJSON}>📄 Export JSON</button>
+                    <button id="export-csv-btn" className="btn btn-secondary btn-sm" onClick={handleExportCSV}>📊 Export CSV</button>
                   </div>
                 </div>
-                <div style={{ background: 'color-mix(in srgb, #ef4444 12%, var(--surface))', border: '1px solid color-mix(in srgb, #ef4444 30%, var(--border))', borderRadius: 12, padding: '16px' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>⚠️ Danger Zone</div>
-                  <div style={{ fontSize: 13, color: 'var(--muted-foreground)', marginBottom: 12 }}>These actions are irreversible. Please proceed with caution.</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button id="clear-history-btn" className="btn btn-danger btn-sm">Clear All History</button>
-                    <button id="delete-account-btn" className="btn btn-danger btn-sm">Delete Account</button>
+
+                {/* Import Card */}
+                <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)', marginBottom: 4 }}>📥 Import Tasks</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>Import tasks from a previously exported JSON or CSV file.</div>
+                  <input
+                    ref={importFileInputRef}
+                    type="file"
+                    accept=".json,.csv"
+                    style={{ display: 'none' }}
+                    onChange={e => handleImportFile(e)}
+                  />
+                  <button id="import-tasks-btn" className="btn btn-primary btn-sm" onClick={() => importFileInputRef.current?.click()}>
+                    📁 Choose Import File (.json / .csv)
+                  </button>
+                </div>
+
+                {/* Backup & Restore Card */}
+                <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)', marginBottom: 4 }}>📦 Backup & Restore</div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>Download a full encrypted database backup or restore system state.</div>
+                  <input
+                    ref={restoreFileInputRef}
+                    type="file"
+                    accept=".json"
+                    style={{ display: 'none' }}
+                    onChange={e => handleImportFile(e, true)}
+                  />
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button id="backup-btn" className="btn btn-secondary btn-sm" onClick={handleExportBackup}>📦 Generate Backup</button>
+                    <button id="restore-btn" className="btn btn-secondary btn-sm" onClick={() => restoreFileInputRef.current?.click()}>🔄 Restore Backup</button>
                   </div>
                 </div>
               </div>
             )}
 
-            {activeSection !== 'data' && (
+            {/* Security Section */}
+            {activeSection === 'security' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--foreground)' }}>Security & Protection</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {[
+                    { title: '🔒 Authentication Middleware', desc: 'Active HTTP session middleware with JWT verification', status: 'Active' },
+                    { title: '🛡️ Rate Limiting', desc: 'Sliding window rate limiting (120 req/min) active on proxy', status: 'Active' },
+                    { title: '🌐 CSRF Protection', desc: 'Origin & Fetch-Site header validation enforced', status: 'Active' },
+                    { title: '💉 SQL Injection Protection', desc: 'Parameterized SQLite statements via Node sqlite driver', status: 'Protected' },
+                    { title: '🧼 XSS Protection', desc: 'Strict React DOM rendering with escaping & sanitized inputs', status: 'Protected' },
+                  ].map(sec => (
+                    <div key={sec.title} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: 'var(--surface-muted)', borderRadius: 12, border: '1px solid var(--border)' }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--foreground)' }}>{sec.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{sec.desc}</div>
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: '#10b98122', color: '#10b981', border: '1px solid #10b98144' }}>
+                        ● {sec.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Save Bar */}
+            {activeSection !== 'data' && activeSection !== 'security' && (
               <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button type="button" className="btn btn-secondary">Cancel</button>
                 <button

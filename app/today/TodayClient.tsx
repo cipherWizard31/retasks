@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useOptimistic } from 'react';
 import AppShell from '../components/AppShell';
 import CreateTaskModal from '../components/CreateTaskModal';
 import TaskCard from '../components/TaskCard';
@@ -8,6 +8,7 @@ import { Task } from '../../lib/data';
 import { completeTaskAction, deleteTaskAction, skipTaskAction, uncheckTaskAction, editTaskAction } from '../actions/tasks';
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
+const PAGE_SIZE = 5;
 
 function getDateStr(daysFromNow: number) {
   const d = new Date(Date.now() + daysFromNow * ONE_DAY);
@@ -28,7 +29,6 @@ function sortTasks(tasks: Task[], sortBy: SortOption): Task[] {
   if (sortBy === 'alphabetical') {
     return sorted.sort((a, b) => a.title.localeCompare(b.title));
   }
-  // Default: due date
   return sorted.sort((a, b) => a.startDate.localeCompare(b.startDate));
 }
 
@@ -58,10 +58,28 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [sortBy, setSortBy] = useState<SortOption>('dueDate');
+  const [pageMap, setPageMap] = useState<Record<string, number>>({});
   const [isPending, startTransition] = useTransition();
 
-  const groups = groupTasks(tasks, sortBy);
-  const todayLike = tasks.filter(t => t.status === 'due' || t.status === 'overdue' || t.status === 'completed');
+  // Optimistic UI updates for high performance
+  const [optimisticTasks, setOptimisticTasks] = useOptimistic(
+    tasks,
+    (current, action: { type: 'complete' | 'uncheck' | 'delete' | 'skip'; id: string }) => {
+      if (action.type === 'complete') {
+        return current.map(t => t.id === action.id ? { ...t, status: 'completed' as const } : t);
+      }
+      if (action.type === 'uncheck') {
+        return current.map(t => t.id === action.id ? { ...t, status: 'due' as const } : t);
+      }
+      if (action.type === 'delete' || action.type === 'skip') {
+        return current.filter(t => t.id !== action.id);
+      }
+      return current;
+    }
+  );
+
+  const groups = groupTasks(optimisticTasks, sortBy);
+  const todayLike = optimisticTasks.filter(t => t.status === 'due' || t.status === 'overdue' || t.status === 'completed');
   const due = todayLike.filter(t => t.status === 'due').length;
   const overdue = todayLike.filter(t => t.status === 'overdue').length;
   const completed = todayLike.filter(t => t.status === 'completed').length;
@@ -69,19 +87,34 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
   const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   const handleComplete = (id: string) => {
-    startTransition(() => { completeTaskAction(id); });
+    startTransition(() => {
+      setOptimisticTasks({ type: 'complete', id });
+      completeTaskAction(id);
+    });
     setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'completed' as const } : t));
   };
+
   const handleUncheck = (id: string) => {
-    startTransition(() => { uncheckTaskAction(id); });
+    startTransition(() => {
+      setOptimisticTasks({ type: 'uncheck', id });
+      uncheckTaskAction(id);
+    });
     setTasks(prev => prev.map(t => t.id === id ? { ...t, status: 'due' as const } : t));
   };
+
   const handleSkip = (id: string) => {
-    startTransition(() => { skipTaskAction(id); });
+    startTransition(() => {
+      setOptimisticTasks({ type: 'skip', id });
+      skipTaskAction(id);
+    });
     setTasks(prev => prev.filter(t => t.id !== id));
   };
+
   const handleDelete = (id: string) => {
-    startTransition(() => { deleteTaskAction(id); });
+    startTransition(() => {
+      setOptimisticTasks({ type: 'delete', id });
+      deleteTaskAction(id);
+    });
     setTasks(prev => prev.filter(t => t.id !== id));
   };
 
@@ -91,10 +124,13 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
     setEditingTask(null);
   };
 
+  const getGroupPage = (groupLabel: string) => pageMap[groupLabel] || 1;
+  const setGroupPage = (groupLabel: string, p: number) => setPageMap(prev => ({ ...prev, [groupLabel]: p }));
+
   return (
     <>
       <AppShell onAddTask={() => setModalOpen(true)}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28, opacity: isPending ? 0.75 : 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28, opacity: isPending ? 0.85 : 1 }}>
 
           {/* Header */}
           <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
@@ -160,7 +196,7 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
             </div>
           </div>
 
-          {/* Grouped Timeline */}
+          {/* Grouped Timeline with Pagination */}
           {groups.length === 0 ? (
             <div className="empty-state">
               <div className="animate-float" style={{ fontSize: 64 }}>🎉</div>
@@ -169,42 +205,73 @@ export default function TodayClient({ initialTasks }: { initialTasks: Task[] }) 
               <button className="btn btn-primary" style={{ marginTop: 20 }} onClick={() => setModalOpen(true)}>Create Task</button>
             </div>
           ) : (
-            groups.map(group => (
-              <section key={group.label} className="animate-fade-in">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                  <span style={{ fontSize: 18 }}>{group.emoji}</span>
-                  <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: group.color }}>
-                    {group.label}
-                  </h2>
-                  <span style={{
-                    fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
-                    background: `${group.color}22`, color: group.color,
-                  }}>
-                    {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
+            groups.map(group => {
+              const currentPage = getGroupPage(group.label);
+              const totalPages = Math.ceil(group.tasks.length / PAGE_SIZE);
+              const paginatedTasks = group.tasks.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-                <div style={{
-                  borderLeft: `3px solid ${group.color}44`,
-                  paddingLeft: 16,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                }}>
-                  {group.tasks.map(task => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onComplete={handleComplete}
-                      onUncheck={handleUncheck}
-                      onSkip={handleSkip}
-                      onEdit={() => setEditingTask(task)}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))
+              return (
+                <section key={group.label} className="animate-fade-in">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>{group.emoji}</span>
+                      <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: group.color }}>
+                        {group.label}
+                      </h2>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
+                        background: `${group.color}22`, color: group.color,
+                      }}>
+                        {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                          className="btn btn-secondary btn-xs"
+                          disabled={currentPage === 1}
+                          onClick={() => setGroupPage(group.label, currentPage - 1)}
+                        >
+                          ‹ Prev
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-xs"
+                          disabled={currentPage === totalPages}
+                          onClick={() => setGroupPage(group.label, currentPage + 1)}
+                        >
+                          Next ›
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{
+                    borderLeft: `3px solid ${group.color}44`,
+                    paddingLeft: 16,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}>
+                    {paginatedTasks.map(task => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onComplete={handleComplete}
+                        onUncheck={handleUncheck}
+                        onSkip={handleSkip}
+                        onEdit={() => setEditingTask(task)}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })
           )}
         </div>
       </AppShell>
